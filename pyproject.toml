@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "amplify-storage-utils"
+version = "0.1.1"
+description = "A short description of your project."
+readme = "README.md"
+authors = [{name = "Joe Futrelle", email = "jfutrelle@whoi.edu"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords = ['storage']
+dependencies = [
+    'boto3',
+    'aiobotocore'
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/storage"]
+
+[project.urls]
+Repository = "https://github.com/WHOIGit/amplify-storage-utils"
