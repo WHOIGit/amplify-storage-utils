@@ -16,20 +16,27 @@ class FilesystemStore(ObjectStore):
             f.write(data)
 
     def get(self, key):
-        with open(self._path(key), 'rb') as f:
-            return f.read()
+        try:
+            with open(self._path(key), 'rb') as f:
+                return f.read()
+        except FileNotFoundError:
+            raise KeyError(key)
         
     def exists(self, key):
         return os.path.exists(self._path(key))
     
     def delete(self, key):
-        os.remove(self._path(key))
+        try:
+            os.remove(self._path(key))
+            return True
+        except FileNotFoundError:
+            raise KeyError(key)
 
     def keys(self):
         return os.listdir(self.root_path)
 
 
-class HashdirStore(ObjectStore):
+class HashdirStore(FilesystemStore):
     def __init__(self, root_path):
         self.root_path = root_path
 
@@ -44,12 +51,5 @@ class HashdirStore(ObjectStore):
         with open(path, 'wb') as f:
             f.write(data)
 
-    def get(self, key):
-        with open(self._path(key), 'rb') as f:
-            return f.read()
-        
-    def exists(self, key):
-        return os.path.exists(self._path(key))
-    
-    def delete(self, key):
-        os.remove(self._path(key))
+    def keys(self):
+        raise NotImplementedError
