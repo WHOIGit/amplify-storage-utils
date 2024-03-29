@@ -16,7 +16,9 @@ classifiers = [
 keywords = ['storage']
 dependencies = [
     'boto3',
-    'aiobotocore'
+    'aiobotocore',
+    'aiofiles',
+    'aiosqlite'
 ]
 
 [tool.hatch.build.targets.wheel]

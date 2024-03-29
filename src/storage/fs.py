@@ -36,6 +36,15 @@ class FilesystemStore(ObjectStore):
         return os.listdir(self.root_path)
 
 
+def hashpath(key, width=2, depth=3):
+    hash = hashlib.sha256(key.encode('utf-8')).hexdigest()
+    # split hash into chunks of size 'width' up to the specified depth
+    path_components = [hash[i:i+width] for i in range(0, width*depth, width)]
+    # append the remaining part of the hash as a single component
+    path_components.append(hash[width*depth:])
+    return os.path.join(*path_components)
+
+
 class HashdirStore(FilesystemStore):
     def __init__(self, root_path, width=2, depth=3):
         self.root_path = root_path
@@ -43,14 +52,7 @@ class HashdirStore(FilesystemStore):
         self.depth = depth
 
     def _path(self, key):
-        width = self.width
-        depth = self.depth
-        hash = hashlib.sha256(key.encode('utf-8')).hexdigest()
-        # split hash into chunks of size 'width' up to the specified depth
-        path_components = [hash[i:i+width] for i in range(0, width*depth, width)]
-        # append the remaining part of the hash as a single component
-        path_components.append(hash[width*depth:])
-        return os.path.join(self.root_path, *path_components)
+        return os.path.join(self.root_path, hashpath(key, self.width, self.depth))
     
     def put(self, key, data):
         path = self._path(key)
