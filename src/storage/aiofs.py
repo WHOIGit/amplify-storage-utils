@@ -37,8 +37,9 @@ class AsyncFilesystemStore(ObjectStore):
             raise KeyError(key)
 
     async def keys(self):
-       for key in await aios.listdir(self.root_path):
-           yield key
+        for dirpath, _, filenames in os.walk(self.root_path):
+            for filename in filenames:
+                yield os.path.relpath(os.path.join(dirpath, filename), self.root_path)
     
 
 class AsyncHashdirStore(AsyncFilesystemStore):

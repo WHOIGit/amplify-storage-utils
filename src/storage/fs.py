@@ -12,6 +12,7 @@ class FilesystemStore(ObjectStore):
         return os.path.join(self.root_path, key)
 
     def put(self, key, data):
+        os.makedirs(os.path.dirname(self._path(key)), exist_ok=True)
         with open(self._path(key), 'wb') as f:
             f.write(data)
 
@@ -33,7 +34,9 @@ class FilesystemStore(ObjectStore):
             raise KeyError(key)
 
     def keys(self):
-        return os.listdir(self.root_path)
+        for dirpath, dirnames, filenames in os.walk(self.root_path):
+            for filename in filenames:
+                yield os.path.relpath(os.path.join(dirpath, filename), self.root_path)
 
 
 def hashpath(key, width=2, depth=3):
