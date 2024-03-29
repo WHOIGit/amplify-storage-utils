@@ -75,7 +75,7 @@ class AsyncCachingStore(ObjectStore):
    
 # utility functions for multi-store actions
             
-async def async_copy_store(from_store, to_store, overwrite=False):
+async def async_copy_store(from_store, to_store, overwrite=True):
     async for key in from_store.keys():
         if overwrite or not await to_store.exists(key):
             await to_store.put(key, await from_store.get(key))

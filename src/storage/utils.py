@@ -72,7 +72,7 @@ class CachingStore(ObjectStore):
    
 # utility functions for multi-store actions
             
-def copy_store(from_store, to_store, overwrite=False):
+def copy_store(from_store, to_store, overwrite=True):
     for key in from_store.keys():
         if overwrite or not to_store.exists(key):
             to_store.put(key, from_store.get(key))
