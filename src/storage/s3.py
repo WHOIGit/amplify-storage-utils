@@ -68,6 +68,15 @@ class BucketStore(ObjectStore):
         keys = [obj['Key'] for obj in response['Contents']]
         return keys
 
+    def presigned_put(self, key, expiry=3600):
+        return self.s3_client.generate_presigned_url('put_object',
+            Params={'Key':key, 'Bucket':self.bucket_name}, ExpiresIn=expiry
+        )
+
+    def presigned_get(self, key, expiry=3600):
+        return self.s3_client.generate_presigned_url('get_object',
+            Params={'Key':key, 'Bucket':self.bucket_name}, ExpiresIn=expiry
+        )
 
 class AsyncBucketStore(ObjectStore):
     def __init__(self, s3_client, bucket_name):
