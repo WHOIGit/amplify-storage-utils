@@ -1,4 +1,5 @@
 import boto3
+import botocore
 import aiobotocore
 from aiobotocore.session import get_session
 
@@ -6,21 +7,24 @@ from .object import ObjectStore
 
 
 class BucketStore(ObjectStore):
-    def __init__(self, s3_url, s3_access_key, s3_secret_key, bucket_name):
+    def __init__(self, s3_url, s3_access_key, s3_secret_key, bucket_name, botocore_config_kwargs={}):
         self.s3_url = s3_url
         self.s3_access_key = s3_access_key
         self.s3_secret_key = s3_secret_key
         self.bucket_name = bucket_name
         self.session = None
         self.s3_client = None
+        self.botocore_config_kwargs = botocore_config_kwargs
 
     def __enter__(self):
         self.session = boto3.session.Session()
+        config = botocore.config.Config(**self.botocore_config_kwargs) if self.botocore_config_kwargs else None
         self.s3_client = self.session.client(
             's3',
             endpoint_url=self.s3_url,
             aws_access_key_id=self.s3_access_key,
-            aws_secret_access_key=self.s3_secret_key
+            aws_secret_access_key=self.s3_secret_key,
+            config = config
         )
         return self
     
