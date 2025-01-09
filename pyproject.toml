@@ -18,7 +18,8 @@ dependencies = [
     'boto3',
     'aiobotocore',
     'aiofiles',
-    'aiosqlite'
+    'aiosqlite',
+    'amplify-mediastore-client @ git+https://github.com/WHOIGit/amplify-mediastore-client'
 ]
 
 [tool.hatch.build.targets.wheel]
