@@ -2,15 +2,63 @@ from abc import abstractmethod
 from base64 import b64decode, b64encode
 import gzip
 from io import BytesIO
+import json
 import logging
 from storage.object import ObjectStore
 import re
 from urllib.parse import urlparse
 
 
-# Store implemtations that combine multiple stores in some way
+# Composable store implementations
 
-class FanoutStore(ObjectStore):
+
+class IdentityStore(ObjectStore):
+    """a no-op store fronting a backing store"""
+
+    def __init__(self, store):
+        self.store = store
+
+    def put(self, key, data):
+        self.store.put(key, data)
+
+    def get(self, key):
+        return self.store.get(key)
+    
+    def exists(self, key):
+        return self.store.exists(key)
+    
+    def delete(self, key):
+        return self.store.delete(key)
+    
+    def keys(self):
+        return self.store.keys()
+    
+
+class ReadonlyStore(IdentityStore):
+
+    def put(self, key, data):
+        raise NotImplementedError
+
+    def delete(self, key):
+        raise NotImplementedError
+    
+
+class WriteonlyStore(IdentityStore):
+    """
+    A store that only supports write operations.
+    """
+
+    def get(self, key):
+        raise NotImplementedError
+
+    def exists(self, key):
+        raise NotImplementedError
+
+    def keys(self):
+        raise NotImplementedError
+    
+
+class MirroringStore(ObjectStore):
     """
     A store that forwards operations to a list of child stores.
     """
@@ -118,6 +166,43 @@ class LoggingStore(ObjectStore):
         return self.store.keys()
 
 
+class ExceptionLoggingScore(LoggingStore):
+
+    def put(self, key, data):
+        try:
+            super().put(key, data)
+        except Exception as e:
+            self.logger.error(f'failed to put {key}: {e}')
+
+    def get(self, key):
+        try:
+            return super().get(key)
+        except Exception as e:
+            self.logger.error(f'failed to get {key}: {e}')
+            return None
+    
+    def exists(self, key):
+        try:
+            return super().exists(key)
+        except Exception as e:
+            self.logger.error(f'failed to exists {key}: {e}')
+            return False
+    
+    def delete(self, key):
+        try:
+            return super().delete(key)
+        except Exception as e:
+            self.logger.error(f'failed to delete {key}: {e}')
+            return False
+    
+    def keys(self):
+        try:
+            return super().keys()
+        except Exception as e:
+            self.logger.error(f'failed to get keys: {e}')
+            return []
+        
+
 class TransformingStore(ObjectStore):
     """
     A store that applies a transformation to data before storing it
@@ -182,6 +267,15 @@ class Base64Store(TransformingStore):
     
     def reverse_transform(self, data):
         return b64decode(data)
+    
+
+class JsonStore(TransformingStore):
+
+    def transform(self, data):
+        return json.dumps(data).encode('utf-8')
+    
+    def reverse_transform(self, data):
+        return json.loads(data.decode('utf-8'))
     
 
 # key-based transformations
@@ -280,6 +374,7 @@ class PrefixStore(KeyTransformingStore):
 
 
 # utility functions for multi-store actions
+
             
 def copy_store(from_store, to_store, overwrite=True):
     for key in from_store.keys():
