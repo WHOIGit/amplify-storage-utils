@@ -51,5 +51,9 @@ class S3MediaStore(MediaStore):
         repsonse: ApiResponse = self.client.get_download_media_url(key)
         download: DownloadSchemaOutput = repsonse.response
         url = download.presigned_get
-        response = requests.get(url).content
+        response = requests.get(url)
+        if not response.ok:
+            raise RuntimeError(f"Failed to download media presigned url: {response.text}")
+        data = response.content
+        return data
     
