@@ -273,7 +273,7 @@ class BufferStore(TransformingStore):
         return b
     
 
-class Base64Store(TransformingStore):
+class Base64Store(TextEncodingStore):
     """
     Store that encodes and decodes data as base64
     """
