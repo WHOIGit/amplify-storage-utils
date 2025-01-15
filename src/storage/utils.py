@@ -234,6 +234,22 @@ class TransformingStore(ObjectStore):
         return self.store.keys()
     
 
+class TextEncodingStore(TransformingStore):
+    """
+    Store that encodes and decodes data as text
+    """
+
+    def __init__(self, store, encoding='utf-8'):
+        super().__init__(store)
+        self.encoding = encoding
+
+    def transform(self, data):
+        return data.encode(self.encoding)
+    
+    def reverse_transform(self, data):
+        return data.decode(self.encoding)
+    
+
 class GzipStore(TransformingStore):
 
     def transform(self, data):
@@ -269,13 +285,13 @@ class Base64Store(TransformingStore):
         return b64decode(data)
     
 
-class JsonStore(TransformingStore):
+class JsonStore(TextEncodingStore):
 
     def transform(self, data):
-        return json.dumps(data).encode('utf-8')
+        return json.dumps(data)
     
     def reverse_transform(self, data):
-        return json.loads(data.decode('utf-8'))
+        return json.loads(data)
     
 
 # key-based transformations
