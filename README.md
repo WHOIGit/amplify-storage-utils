@@ -25,11 +25,11 @@ Concrete implementations of the `ObjectStore` interface are provided for various
 
 The `storage.utils` module provides utilities for working with multiple stores, including:
 
-- `FanoutStore` which replicates operations across a set of child stores
+- `MirroringStore` which replicates operations across a set of child stores
 - `CachingStore` in which a faster store can be used as a cache for a slower store
 - the `sync_stores` function for making two stores' contents identical
 
-`asyncio` versions of the utilities are provided in the `aioutils` module.
+`asyncio` versions of some of the utilities are provided in the `aioutils` module.
 
 ## Usage
 
