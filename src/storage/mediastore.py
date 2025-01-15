@@ -5,7 +5,7 @@ import requests
 
 from storage.object import ObjectStore
 
-from media_store_client import ApiClient, ApiResponse
+from media_store_client import ApiClient, ApiResponse, ClientError
 from schemas.mediastore import DownloadSchemaOutput
 
 
@@ -20,7 +20,7 @@ class MediaStore(ObjectStore):
         # create temporary file because upload_media expects a file path
         with tempfile.NamedTemporaryFile() as temp_file:
             temp_file.write(data)
-            self.client.upload_media(key, temp_file.name, self.pid_type, self.store_config)
+            self.client.upload_media(temp_file.name, key, self.pid_type, self.store_config)
 
     def get(self, key):
         api_response: ApiResponse = self.client.get_download_media(key)
