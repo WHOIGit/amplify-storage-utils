@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from base64 import b64decode, b64encode
 import gzip
+import hashlib
 from io import BytesIO
 import json
 import logging
@@ -387,6 +388,21 @@ class PrefixStore(KeyTransformingStore):
 
     def reverse_transform_key(self, key):
         return key[len(self.prefix):]
+
+
+class HashPrefixStore(KeyTransformingStore):
+
+    def __init__(self, store, hash_length=8, separator='/'):
+        self.store = store
+        self.hash_length = hash_length
+        self.separator = separator
+
+    def transform_key(self, key):
+        hash_prefix = hashlib.sha256(key.encode()).hexdigest()[:self.hash_length]
+        return hash_prefix + self.separator + key
+
+    def reverse_transform_key(self, key):
+        return key[self.hash_length:]
 
 
 class UrlEncodingStore(KeyTransformingStore):
