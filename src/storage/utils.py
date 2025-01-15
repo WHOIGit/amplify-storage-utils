@@ -6,7 +6,7 @@ import json
 import logging
 from storage.object import ObjectStore
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote, unquote
 
 
 # Composable store implementations
@@ -372,6 +372,25 @@ class PrefixStore(KeyTransformingStore):
     def reverse_transform_key(self, key):
         return key[len(self.prefix):]
 
+
+class UrlEncodingStore(KeyTransformingStore):
+    """
+    A store that handles URL encoding and decoding of keys while preserving
+    hierarchical structure (slashes).
+    """
+    
+    def transform_key(self, key):
+        # Split by slashes and encode each part separately
+        parts = key.split('/')
+        encoded_parts = [quote(part, safe='') for part in parts]
+        return '/'.join(encoded_parts)
+    
+    def reverse_transform_key(self, key):
+        # Split by slashes and decode each part separately
+        parts = key.split('/')
+        decoded_parts = [unquote(part) for part in parts]
+        return '/'.join(decoded_parts)
+    
 
 # utility functions for multi-store actions
 
