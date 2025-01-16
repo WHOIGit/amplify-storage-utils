@@ -22,12 +22,12 @@ class ObjectStore(ABC):
     Stateful implementations of the object store should provide a context manager interface, allowing the store to be used in a with statement.
     """
     @abstractmethod
-    def get(self, key) -> bytearray:
+    def get(self, key) -> bytes:
         """ return the data associated with the key"""
         pass
 
     @abstractmethod
-    def put(self, key, data: bytearray):
+    def put(self, key, data: bytes):
         """ store the data associated with the key from the file-like object data. """
         pass
 
