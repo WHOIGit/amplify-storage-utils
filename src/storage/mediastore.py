@@ -87,10 +87,6 @@ class MediaStore(ObjectStore):
     def put(self, key: str, data: bytearray):
         """Store object data with given key (pid)"""
         self._ensure_store_config()
-        
-        exists = self.exists(key)
-        if exists:
-            self.delete(key)
 
         # Prepare media creation request
         media_data = {
