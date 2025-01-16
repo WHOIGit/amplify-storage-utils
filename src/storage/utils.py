@@ -129,7 +129,10 @@ class CachingStore(ObjectStore):
 
     def clear(self, key=None):
         if key is None:
+            to_delete = []
             for cached_key in self.cache_store.keys():
+                to_delete.append(cached_key)
+            for cached_key in to_delete:
                 self.cache_store.delete(cached_key)
         elif self.cache_store.exists(key):
             self.cache_store.delete(key)
@@ -402,7 +405,7 @@ class HashPrefixStore(KeyTransformingStore):
         return hash_prefix + self.separator + key
 
     def reverse_transform_key(self, key):
-        return key[self.hash_length:]
+        return key[self.hash_length + len(self.separator):]
 
 
 class UrlEncodingStore(KeyTransformingStore):
@@ -434,7 +437,7 @@ def copy_store(from_store, to_store, overwrite=True):
 
 
 def clear_store(store):
-    for key in store.keys():
+    for key in list(store.keys()):
         store.delete(key)
 
 
