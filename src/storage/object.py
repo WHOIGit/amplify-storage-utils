@@ -67,9 +67,8 @@ class DictStore(ObjectStore):
         return key in self.objects
 
     def delete(self, key):
-        if not self.exists(key):
-            raise KeyError(key)
-        del self.objects[key]
+        if key in self.objects:
+            del self.objects[key]
 
     def keys(self):
         return self.objects.keys()
