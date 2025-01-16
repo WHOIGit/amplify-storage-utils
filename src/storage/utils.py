@@ -142,6 +142,42 @@ class CachingStore(ObjectStore):
 ## TODO caching store that uses a TTL cache
 
 
+class NotifyingStore(IdentityStore):
+
+    def __init__(self, store):
+        super().__init__(store)
+        self.put_handlers = []
+        self.delete_handlers = []
+
+    def on_put(self, handler):
+        self.put_handlers.append(handler)
+
+    def on_delete(self, handler):
+        self.delete_handlers.append(handler)
+
+    def put(self, key, data):
+        e = None
+        try:
+            self.store.put(key, data)
+        except Exception as e:
+            pass
+        for handler in self.put_handlers:
+            handler(self.store, key, e)
+        if e is not None:
+            raise e
+
+    def delete(self, key):
+        e = None
+        try:
+            self.store.delete(key)
+        except Exception as e:
+            pass
+        for handler in self.put_handlers:
+            handler(self.store, key, e)
+        if e is not None:
+            raise e
+
+
 class LoggingStore(ObjectStore):
 
     def __init__(self, store, store_name='store', logger=logging.getLogger()):
