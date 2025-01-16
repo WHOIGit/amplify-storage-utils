@@ -54,12 +54,6 @@ class DictStore(ObjectStore):
     def __init__(self):
         self.objects = {}
 
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        pass
-
     def get(self, key):
         bytes = self.objects.get(key)
         if bytes is None:
