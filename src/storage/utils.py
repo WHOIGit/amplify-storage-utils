@@ -172,7 +172,7 @@ class NotifyingStore(IdentityStore):
             self.store.delete(key)
         except Exception as e:
             pass
-        for handler in self.put_handlers:
+        for handler in self.delete_handlers:
             handler(self.store, key, e)
         if e is not None:
             raise e
@@ -442,6 +442,10 @@ class HashPrefixStore(KeyTransformingStore):
 
     def reverse_transform_key(self, key):
         return key[self.hash_length + len(self.separator):]
+    
+    def keys(self):
+        for key in self.store.keys():
+            yield self.reverse_transform_key(key)
 
 
 class UrlEncodingStore(KeyTransformingStore):
