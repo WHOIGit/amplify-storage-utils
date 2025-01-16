@@ -6,8 +6,6 @@ from .object import ObjectStore
 class SqliteStore(ObjectStore):
     def __init__(self, db_path):
         self.db_path = db_path
-        with sqlite3.connect(db_path) as conn:
-            conn.execute('CREATE TABLE IF NOT EXISTS objects (key TEXT PRIMARY KEY, data BLOB)')
 
     def open(self):
         self.conn = sqlite3.connect(self.db_path)
@@ -17,6 +15,7 @@ class SqliteStore(ObjectStore):
 
     def __enter__(self):
         self.open()
+        self.conn.execute('CREATE TABLE IF NOT EXISTS objects (key TEXT PRIMARY KEY, data BLOB)')
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
