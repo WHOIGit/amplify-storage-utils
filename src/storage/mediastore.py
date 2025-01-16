@@ -11,8 +11,9 @@ class MediaStore(ObjectStore):
     """
     def __init__(self, 
                  base_url: str, 
-                 username: str, 
-                 password: str, 
+                 username: Optional[str] = None, 
+                 password: Optional[str] = None,
+                 token: Optional[str] = None,
                  store_config: Optional[dict] = None,
                  pid_type: str = "DEFAULT"):
         """
@@ -29,7 +30,7 @@ class MediaStore(ObjectStore):
         self.base_url = base_url.rstrip('/')
         self.username = username
         self.password = password
-        self._token = None
+        self._token = token
         self.store_config = store_config
         self.pid_type = pid_type
         self._session = requests.Session()
@@ -45,12 +46,13 @@ class MediaStore(ObjectStore):
 
     def _authenticate(self):
         """Authenticate with the API and store the token"""
-        response = self._session.post(
-            f"{self.base_url}/api/login",
-            json={"username": self.username, "password": self.password}
-        )
-        response.raise_for_status()
-        self._token = response.json()["token"]
+        if self._token is None:
+            response = self._session.post(
+                f"{self.base_url}/api/login",
+                json={"username": self.username, "password": self.password}
+            )
+            response.raise_for_status()
+            self._token = response.json()["token"]
         self._session.headers.update({"Authorization": f"Bearer {self._token}"})
 
     def _ensure_store_config(self):
@@ -86,6 +88,10 @@ class MediaStore(ObjectStore):
         """Store object data with given key (pid)"""
         self._ensure_store_config()
         
+        exists = self.exists(key)
+        if exists:
+            self.delete(key)
+
         # Prepare media creation request
         media_data = {
             "pid": key,
