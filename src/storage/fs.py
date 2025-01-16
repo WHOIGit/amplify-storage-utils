@@ -2,6 +2,7 @@ import os
 import hashlib
 
 from storage.object import ObjectStore
+from storage.utils import KeyTransformingStore
 
 
 class FilesystemStore(ObjectStore):
@@ -48,20 +49,37 @@ def hashpath(key, width=2, depth=3):
     return os.path.join(*path_components)
 
 
-class HashdirStore(FilesystemStore):
+class HashdirStore(KeyTransformingStore):
+    """A store that transforms keys into hash-based paths before storing them in a filesystem.
+    
+    This helps distribute files across directories to avoid having too many files
+    in a single directory, which can cause performance issues in some filesystems.
+    """
+    
     def __init__(self, root_path, width=2, depth=3):
-        self.root_path = root_path
+        """Initialize the store.
+        
+        Args:
+            root_path: Base directory for storing files
+            width: Width of each directory level in characters
+            depth: Number of directory levels to create
+        """
         self.width = width
         self.depth = depth
-
-    def _path(self, key):
-        return os.path.join(self.root_path, hashpath(key, self.width, self.depth))
+        # Create the backing FilesystemStore
+        fs_store = FilesystemStore(root_path)
+        super().__init__(fs_store)
     
-    def put(self, key, data):
-        path = self._path(key)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'wb') as f:
-            f.write(data)
+    def transform_key(self, key):
+        """Transform a key into a hash-based path."""
+        return hashpath(key, self.width, self.depth)
+
+    def reverse_transform_key(self, key):
+        """HashdirStore cannot reliably reverse the hash transformation,
+        so listing keys is not supported."""
+        raise NotImplementedError
 
     def keys(self):
+        """HashdirStore does not support listing keys since the transformation
+        cannot be reversed."""
         raise NotImplementedError
