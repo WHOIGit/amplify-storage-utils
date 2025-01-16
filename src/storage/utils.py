@@ -143,17 +143,27 @@ class CachingStore(ObjectStore):
 
 
 class NotifyingStore(IdentityStore):
+    PUT = 'put'
+    DELETE = 'delete'
 
     def __init__(self, store):
         super().__init__(store)
-        self.put_handlers = []
-        self.delete_handlers = []
+        self.handlers = []
+
+    def on_change(self, handler):
+        self.handlers.append(handler)
 
     def on_put(self, handler):
-        self.put_handlers.append(handler)
+        def wrapped(store, action, key, e):
+            if action == self.PUT:
+                handler(store, key, e)
+        self.handlers.append(wrapped)
 
     def on_delete(self, handler):
-        self.delete_handlers.append(handler)
+        def wrapped(store, action, key, e):
+            if action == self.DELETE:
+                handler(store, key, e)
+        self.handlers.append(wrapped)
 
     def put(self, key, data):
         e = None
@@ -161,8 +171,8 @@ class NotifyingStore(IdentityStore):
             self.store.put(key, data)
         except Exception as e:
             pass
-        for handler in self.put_handlers:
-            handler(self.store, key, e)
+        for handler in self.handlers:
+            handler(self.store, self.PUT, key, e)
         if e is not None:
             raise e
 
@@ -172,8 +182,8 @@ class NotifyingStore(IdentityStore):
             self.store.delete(key)
         except Exception as e:
             pass
-        for handler in self.delete_handlers:
-            handler(self.store, key, e)
+        for handler in self.handlers:
+            handler(self.store, self.DELETE, key, e)
         if e is not None:
             raise e
 

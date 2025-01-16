@@ -7,10 +7,10 @@ import logging
 import re
 from storage.object import DictStore
 from storage.utils import (
-    IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore,
+    IdentityStore, NotifyingStore, ReadonlyStore, WriteonlyStore, MirroringStore,
     CachingStore, TransformingStore, TextEncodingStore, GzipStore,
     BufferStore, Base64Store, JsonStore, PrefixStore, UrlEncodingStore,
-    LoggingStore, ExceptionLoggingScore, KeyValidatingStore, RegexValidator,
+    LoggingStore, ExceptionLoggingScore, KeyValidatingStore,
     UrlValidatingStore, HashPrefixStore, RegexValidatingStore,
     copy_store, clear_store, sync_stores
 )
@@ -365,6 +365,60 @@ class TestHashPrefixStore:
         # Test keys() removes hash prefix
         assert list(hash_store.keys()) == [test_key]
 
+
+class TestNotifyingStore:
+
+    def test_notify(self, store, test_key, test_data):
+        def put_handler(s, operation, key, exc):
+            assert s is store
+            assert operation == NotifyingStore.PUT
+            assert key == test_key
+            assert exc is None
+
+        notifying_store = NotifyingStore(store)
+        notifying_store.on_change(put_handler)
+        notifying_store.put(test_key, test_data)
+
+        def delete_handler(s, operation, key, exc):
+            assert s is store
+            assert operation == NotifyingStore.DELETE
+            assert key == test_key
+            assert exc is None
+    
+        notifying_store = NotifyingStore(store)
+        notifying_store.on_change(delete_handler)
+        notifying_store.delete(test_key)
+
+        def failed_put_handler(s, operation, key, exc):
+            assert s is store
+            assert operation == NotifyingStore.PUT
+            assert key == test_key
+            assert exc is not None
+
+        def failed_delete_handler(s, operation, key, exc):
+            assert s is store
+            assert operation == NotifyingStore.DELETE
+            assert key == test_key
+            assert exc is not None
+
+        class ErrorStore(DictStore):
+            def put(self, key, data):
+                raise Exception("put error")
+            def delete(self, key):
+                raise Exception("delete error")
+            
+        error_store = ErrorStore()
+        notifying_store = NotifyingStore(error_store)
+        notifying_store.on_change(failed_put_handler)
+        notifying_store.on_change(failed_delete_handler)
+
+        with pytest.raises(Exception):
+            notifying_store.put(test_key, test_data)
+
+        with pytest.raises(Exception):
+            notifying_store.delete(test_key)
+
+
 def test_copy_store(store, test_data):
     source = DictStore()
     keys = ["key1", "key2", "key3"]
@@ -413,3 +467,4 @@ def test_sync_stores():
     sync_stores(source, target, delete=True)
     assert not target.exists("key3")
     assert set(target.keys()) == set(source.keys())
+
