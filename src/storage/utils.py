@@ -38,10 +38,10 @@ class IdentityStore(ObjectStore):
 class ReadonlyStore(IdentityStore):
 
     def put(self, key, data):
-        raise NotImplementedError
+        raise NotImplementedError('store is read-only')
 
     def delete(self, key):
-        raise NotImplementedError
+        raise NotImplementedError('store is read-only')
     
 
 class WriteonlyStore(IdentityStore):
@@ -50,13 +50,13 @@ class WriteonlyStore(IdentityStore):
     """
 
     def get(self, key):
-        raise NotImplementedError
+        raise NotImplementedError('store is write-only')
 
     def exists(self, key):
-        raise NotImplementedError
+        raise NotImplementedError('store is write-only')
 
     def keys(self):
-        raise NotImplementedError
+        raise NotImplementedError('store is write-only')
     
 
 class MirroringStore(ObjectStore):
