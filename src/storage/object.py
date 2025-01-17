@@ -51,8 +51,10 @@ class DictStore(ObjectStore):
     """
     Stores data in a dictionary in memory.
     """
-    def __init__(self):
-        self.objects = {}
+    def __init__(self, objects=None):
+        if objects is None:
+            objects = dict()
+        self.objects = objects
 
     def get(self, key):
         bytes = self.objects.get(key)
