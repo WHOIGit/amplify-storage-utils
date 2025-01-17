@@ -4,46 +4,34 @@ from storage.fs import FilesystemStore, HashdirStore
 from storage.object import DictStore
 from storage.db import SqliteStore
 
-@pytest.fixture(params=[
-    pytest.param(DictStore, id="dict-store"),
-    pytest.param((SqliteStore, [':memory:']), id="sqlite-store"),
-    pytest.param(FilesystemStore, id="filesystem-store"),
-    pytest.param(HashdirStore, id="hashdir-store"),
-])
-def store_config(request):
-    """Fixture that provides store factory and its parameters"""
-    return request.param
+@pytest.fixture
+def dict_store():
+    """Fixture for DictStore"""
+    return DictStore()
 
 @pytest.fixture
-def store(store_config):
-    """
-    Fixture that handles store creation and cleanup.
-    Uses the factory pattern to support complex initialization.
-    """
-    if isinstance(store_config, tuple):
-        if len(store_config) == 2:
-            factory, args = store_config
-            kw = {}
-        elif len(store_config) == 3:
-            factory, args, kw = store_config
-    else:
-        factory = store_config
-        args = ()
-        kw = {}
-    
-    if factory in [FilesystemStore, HashdirStore]:
-        # Special case for FilesystemStore, use temporary directory
-        with tempfile.TemporaryDirectory() as tmpdir:
-            store_instance = factory(tmpdir)
-            yield store_instance
-    elif hasattr(factory, '__enter__'):
-        # Context manager case (for cleanup)
-        with factory(*args, **kw) as store_instance:
-            yield store_instance
-    else:
-        # Factory function case
-        store_instance = factory(*args, **kw)
-        yield store_instance
+def sqlite_store():
+    """Fixture for SqliteStore using in-memory database"""
+    with SqliteStore(":memory:") as store:
+        yield store
+
+@pytest.fixture
+def filesystem_store():
+    """Fixture for FilesystemStore using temporary directory"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield FilesystemStore(tmpdir)
+
+@pytest.fixture
+def hashdir_store():
+    """Fixture for HashdirStore using temporary directory"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield HashdirStore(tmpdir)
+
+# Main parametrized fixture that uses the individual store fixtures
+@pytest.fixture(params=['dict_store', 'sqlite_store', 'filesystem_store', 'hashdir_store'])
+def store(request):
+    """Main fixture that provides different store implementations"""
+    return request.getfixturevalue(request.param)
 
 def test_put_and_get(store):
     """Test basic put and get operations"""
