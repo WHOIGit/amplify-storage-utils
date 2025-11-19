@@ -54,9 +54,13 @@ class BucketStore(ObjectStore):
                 Key=key
             )
             return True
-        except self.s3_client.exceptions.NoSuchKey:
-            return False
-        
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response['Error']['Code']
+            if int(error_code) == 404:
+                return False
+            else:
+                raise
+
     def delete(self, key):
         self.s3_client.delete_object(
             Bucket=self.bucket_name,
