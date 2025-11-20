@@ -19,7 +19,7 @@ dependencies = [
     'aiobotocore',
     'aiofiles',
     'aiosqlite',
-    'yaml',
+    'pyyaml',
 ]
 
 [tool.hatch.build.targets.wheel]
