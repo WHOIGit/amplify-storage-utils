@@ -19,7 +19,7 @@ dependencies = [
     'aiobotocore',
     'aiofiles',
     'aiosqlite',
-    'python-dotenv',
+    'yaml',
 ]
 
 [tool.hatch.build.targets.wheel]
