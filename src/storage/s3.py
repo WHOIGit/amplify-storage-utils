@@ -69,12 +69,11 @@ class BucketStore(ObjectStore):
         return True
     
     def keys(self, prefix=''):
-        response = self.s3_client.list_objects_v2(
-            Bucket=self.bucket_name,
-            Prefix=prefix
-        )
-        keys = [obj['Key'] for obj in response['Contents']]
-        return keys
+        paginator = self.s3_client.get_paginator('list_objects_v2')
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+        for page in page_iterator:
+            for obj in page.get('Contents', []):
+                yield obj['Key']
 
     def presigned_put(self, key, expiry=3600):
         return self.s3_client.generate_presigned_url('put_object',
