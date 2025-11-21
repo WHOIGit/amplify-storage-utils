@@ -216,7 +216,7 @@ class LoggingStore(ObjectStore):
         return self.store.keys()
 
 
-class ExceptionLoggingScore(LoggingStore):
+class ExceptionLoggingStore(LoggingStore):
 
     def put(self, key, data):
         try:
