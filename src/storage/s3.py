@@ -56,7 +56,7 @@ class BucketStore(ObjectStore):
             return True
         except botocore.exceptions.ClientError as e:
             error_code = e.response['Error']['Code']
-            if int(error_code) == 404:
+            if error_code == '404' or error_code == 'NoSuchKey':
                 return False
             else:
                 raise
@@ -121,7 +121,7 @@ class AsyncBucketStore(ObjectStore):
             return True
         except botocore.exceptions.ClientError as e:
             error_code = e.response['Error']['Code']
-            if int(error_code) == 404:
+            if error_code == '404' or error_code == 'NoSuchKey':
                 return False
             else:
                 raise
