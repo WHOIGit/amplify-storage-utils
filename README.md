@@ -79,6 +79,12 @@ store.delete('my_object_key')
 
 # List all object keys (if supported by the implementation)
 keys = list(store.keys())
+
+# For S3 stores, store.keys() returns a Generator to support S3 pagination. 
+# To list all object keys
+keys = []
+for key in store.keys():
+  keys.append(key)
 ```
 
 Some implementations, such as `SqliteStore` and `ZipStore`, are stateful and should be used as context managers:
