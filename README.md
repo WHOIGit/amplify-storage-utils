@@ -23,11 +23,32 @@ Concrete implementations of the `ObjectStore` interface are provided for various
 
 ### Utilities
 
-The `storage.utils` module provides utilities for working with multiple stores, including:
+The `storage.utils` module provides utilities for working with more complex store setups, including:
 
-- `MirroringStore` which replicates operations across a set of child stores
-- `CachingStore` in which a faster store can be used as a cache for a slower store
-- the `sync_stores` function for making two stores' contents identical
+- Multi-store setups 
+  - `MirroringStore` which replicates operations across a set of child stores
+  - `CachingStore` in which a faster store can be used as a cache for a slower store
+- `ReadonlyStore` to create a store without put or delete functionality
+- `WriteonlyStore` to create a store without get, exists, or key listing functionality
+- `NotifyingStore` to set handlers that run on changes and/or put calls
+- `LoggingStore` to create a store with a logger
+- `ExceptionLoggingStore` to create a store that logs any exceptions encountered
+- Data Transformation Stores
+  - `TextEncodingStore` that encodes and decodes data as text via a specified encoding
+  - `GzipStore` that stores data with gzip compression
+  - `BufferStore` that provides a buffer interface for a backing store
+  - `Base64Store` that encodes and decodes data as base64
+- Key Transforming Stores
+  - `KeyValidatingStore` that validates keys using a given validator
+  - `RegexValidatingStore`, that uses Regex to validate keys
+  - `UrlValidatingStore` that validates keys as URLs
+  - `PrefixStore` that prefixes keys with a given prefix
+  - `HashPrefixStore` that hashes each key and adds the hash as a prefix
+  - `UrlEncodingStore` that handles URL encoding and decoding of keys while preserving hierarchical structure
+- Utility functions including: 
+  - `sync_stores` for making two stores' contents identical
+  - `copy_store` for copying a store into another
+  - `clear_store` for removing all store data
 
 `asyncio` versions of some of the utilities are provided in the `aioutils` module.
 
