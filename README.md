@@ -33,12 +33,12 @@ The `storage.utils` module provides utilities for working with more complex stor
 - `NotifyingStore` to set handlers that run on changes and/or put calls
 - `LoggingStore` to create a store with a logger
 - `ExceptionLoggingStore` to create a store that logs any exceptions encountered
-- Data Transformation Stores
+- Data transformation stores
   - `TextEncodingStore` that encodes and decodes data as text via a specified encoding
   - `GzipStore` that stores data with gzip compression
   - `BufferStore` that provides a buffer interface for a backing store
   - `Base64Store` that encodes and decodes data as base64
-- Key Transforming Stores
+- Key transforming stores
   - `KeyValidatingStore` that validates keys using a given validator
   - `RegexValidatingStore`, that uses Regex to validate keys
   - `UrlValidatingStore` that validates keys as URLs
