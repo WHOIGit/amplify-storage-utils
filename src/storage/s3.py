@@ -86,15 +86,32 @@ class BucketStore(ObjectStore):
         )
 
 class AsyncBucketStore(ObjectStore):
-    def __init__(self, s3_client, bucket_name):
+    def __init__(self, bucket_name, endpoint_url, aws_access_key_id, aws_secret_access_key, botocore_config=None):
         self.bucket_name = bucket_name
-        self.s3_client = s3_client
+        self._endpoint_url = endpoint_url
+        self._aws_access_key_id = aws_access_key_id
+        self._aws_secret_access_key = aws_secret_access_key
+        self._config = botocore_config
+        self._session = None
+        self._client_cm = None
+        self.s3_client = None
 
     async def __aenter__(self):
+        self._session = get_session()
+        self._client_cm = self._session.create_client(
+            "s3",
+            endpoint_url=self._endpoint_url,
+            aws_access_key_id=self._aws_access_key_id,
+            aws_secret_access_key=self._aws_secret_access_key,
+            config=self._config
+        )
+        self.s3_client = await self._client_cm.__aenter__()
+
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        pass
+        if self._client_cm is not None:
+            await self._client_cm.__aexit__(exc_type, exc, tb)
 
     async def put(self, key, data):
         await self.s3_client.put_object(
