@@ -103,11 +103,64 @@ The `AsyncBucketStore` class provides an asynchronous interface for S3-compatibl
 from storage.s3 import AsyncBucketStore
 
 async def main():
-    # configuring S3 client left as an exercise to the reader
-    async with ... as s3_client:
-        async with AsyncBucketStore(s3_client, 'my-bucket') as store:
-            await store.put('my_object_key', b'my object data')
-            data = await store.get('my_object_key')
+    async with AsyncBucketStore(bucket_name="bucket-name", endpoint_url="http://endpoint", s3_access_key="X", s3_secret_key="Y") as store:
+        await store.put('my_object_key', b'my object data')
+        data = await store.get('my_object_key')
 
 asyncio.run(main())
+```
+
+## YAML configuration
+
+As an alternative to using Python to define your store configurations, you can also use YAML to create a configuration schema. 
+
+Config files must define each store under "stores".
+
+Each store must have a type, specifiying the store class. If the store is a decorator, it must have a "base" parameter specifiying the name of the store that it will decorate. 
+
+```
+stores:
+  store1:
+    type: DictStore
+
+  readonly_store:
+    type: ReadonlyStore
+    base: store1
+
+main: readonly_store
+
+```
+
+Config files must have a "main" parameter specifiying the name of the store that will be built by default for the file.
+
+If the store has initialization parameters, they may be specified by the "config" parameter.
+
+```
+  async_store:
+    type: AsyncBucketStore
+    config:
+      endpoint_url: http://test
+      s3_access_key: X
+      s3_secret_key: Y
+      bucket_name: test-bucket
+```
+
+CachingStores and their async equivalent have two specified bases:
+
+```
+  caching_store:
+    type: CachingStore
+    base:
+      main_store: hash_prefix_store
+      cache_store: backup_store
+```
+
+MirroringStores and their async equivalent have a list of base stores:
+
+```
+  mirror_store:
+    type: MirroringStore
+    base:
+      - caching_store
+      - text_encoding_store
 ```
