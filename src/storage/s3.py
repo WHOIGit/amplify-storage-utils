@@ -86,11 +86,11 @@ class BucketStore(ObjectStore):
         )
 
 class AsyncBucketStore(ObjectStore):
-    def __init__(self, bucket_name, endpoint_url, aws_access_key_id, aws_secret_access_key, botocore_config=None):
+    def __init__(self, bucket_name, endpoint_url, s3_access_key, s3_secret_key, botocore_config=None):
         self.bucket_name = bucket_name
         self._endpoint_url = endpoint_url
-        self._aws_access_key_id = aws_access_key_id
-        self._aws_secret_access_key = aws_secret_access_key
+        self._s3_access_key = s3_access_key
+        self._s3_secret_key = s3_secret_key
         self._config = botocore_config
         self._session = None
         self._client_cm = None
@@ -101,8 +101,8 @@ class AsyncBucketStore(ObjectStore):
         self._client_cm = self._session.create_client(
             "s3",
             endpoint_url=self._endpoint_url,
-            aws_access_key_id=self._aws_access_key_id,
-            aws_secret_access_key=self._aws_secret_access_key,
+            aws_access_key_id=self._s3_access_key,
+            aws_secret_access_key=self._s3_secret_key,
             config=self._config
         )
         self.s3_client = await self._client_cm.__aenter__()
