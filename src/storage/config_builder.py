@@ -53,7 +53,8 @@ class StoreFactory:
     def _parse_dictionary_base(self, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
         if store_type == 'CachingStore':
-            config.update(base_config)
+            config['main_store'] = self.build(base_config['main_store'])
+            config['cache_store'] = self.build(base_config['cache_store'])
         else:
             self._raise_invalid_base_config(store_type, type(base_config))
         return config
@@ -65,7 +66,7 @@ class StoreFactory:
             built_child_stores = []
             for child_store in base_config:
                 built_child_stores.append(self.build(child_store))
-            config['children'] = base_config
+            config['children'] = built_child_stores
         else:
             self._raise_invalid_base_config(store_type, type(base_config))
         return config
@@ -90,7 +91,9 @@ class StoreFactory:
         config = store_def.get('config', {})
 
         base_config = store_def.get('base', {})
-        if isinstance(base_config, dict):
+        if base_config == {}:
+            pass
+        elif isinstance(base_config, dict):
             config = self._parse_dictionary_base(store_type, config, base_config)
         elif isinstance(base_config, list):
             config = self._parse_list_base(store_type, config, base_config)
