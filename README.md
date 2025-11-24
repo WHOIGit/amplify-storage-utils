@@ -128,10 +128,9 @@ stores:
     base: store1
 
 main: readonly_store
-
 ```
 
-Config files must have a "main" parameter specifiying the name of the store that will be built by default for the file.
+Config files must have a "main" parameter specifying the name of the store that will be built by default for the file.
 
 If the store has initialization parameters, they may be specified by the "config" parameter.
 
