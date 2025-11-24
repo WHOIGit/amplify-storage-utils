@@ -1,8 +1,13 @@
 import yaml
-from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, JsonStore, KeyTransformingStore, KeyValidatingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
-from .s3 import BucketStore, AsyncBucketStore
+from .aiodb import AsyncSqliteStore
+from .aiofs import AsyncFilesystemStore, AsyncHashdirStore
+from .aioutils import AsyncFanoutStore, AsyncCachingStore
+from .db import SqliteStore
+from .fs import FilesystemStore, HashdirStore
+from .mediastore import MediaStore
 from .object import DictStore
-
+from .s3 import BucketStore, AsyncBucketStore
+from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, ExceptionLoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, JsonStore, KeyTransformingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
 
 class ConfigError(Exception):
     pass
@@ -12,16 +17,26 @@ class StoreFactory:
     """ Builds stores from a YAML config file. """
     
     STORES = {
+          'AsyncSqliteStore': AsyncSqliteStore,
+          'AsyncFilesystemStore': AsyncFilesystemStore,
+          'AsyncHashdirStore': AsyncHashdirStore,
+          'AsyncFanoutStore': AsyncFanoutStore,
+          'AsyncCachingStore': AsyncCachingStore,
+          'SqliteStore': SqliteStore,
+          'FilesystemStore': FilesystemStore,
+          'HashdirStore': HashdirStore,
+          'MediaStore': MediaStore,
+          'DictStore': DictStore,
           'BucketStore': BucketStore,
           'AsyncBucketStore': AsyncBucketStore,
-          'DictStore': DictStore,
           'IdentityStore': IdentityStore,
           'ReadonlyStore': ReadonlyStore,
           'WriteonlyStore': WriteonlyStore,
           'MirroringStore': MirroringStore,
           'CachingStore': CachingStore,
           'NotifyingStore': NotifyingStore,
-          'LoggingStore': LoggingStore,
+          'LoggingStore': LoggingStore, # Non-default logger option is unsupported in YAML configuration. Use logging.basicConfig() after initialization
+          'ExceptionLoggingStore': ExceptionLoggingStore, # Non-default logger option is unsupported in YAML configuration. Use logging.basicConfig() after initialization
           'TransformingStore': TransformingStore,
           'TextEncodingStore': TextEncodingStore,
           'GzipStore': GzipStore,
@@ -29,7 +44,6 @@ class StoreFactory:
           'Base64Store': Base64Store,
           'JsonStore': JsonStore,
           'KeyTransformingStore': KeyTransformingStore,
-          'KeyValidatingStore': KeyValidatingStore,
           'PrefixStore': PrefixStore,
           'HashPrefixStore': HashPrefixStore,
           'UrlEncodingStore': UrlEncodingStore,
@@ -52,7 +66,7 @@ class StoreFactory:
 
     def _parse_dictionary_base(self, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
-        if store_type == 'CachingStore':
+        if store_type == 'CachingStore' or store_type == 'AsyncCachingStore':
             config['main_store'] = self.build(base_config['main_store'])
             config['cache_store'] = self.build(base_config['cache_store'])
         else:
@@ -62,7 +76,7 @@ class StoreFactory:
 
     def _parse_list_base(self, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
-        if store_type == 'MirroringStore':
+        if store_type == 'MirroringStore' or store_type == 'AsyncFanoutStore':
             built_child_stores = []
             for child_store in base_config:
                 built_child_stores.append(self.build(child_store))
