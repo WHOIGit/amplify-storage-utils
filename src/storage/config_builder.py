@@ -35,8 +35,8 @@ class StoreFactory:
           'MirroringStore': MirroringStore,
           'CachingStore': CachingStore,
           'NotifyingStore': NotifyingStore,
-          'LoggingStore': LoggingStore, # Non-default logger option is unsupported in YAML configuration. Use logging.basicConfig() after initialization
-          'ExceptionLoggingStore': ExceptionLoggingStore, # Non-default logger option is unsupported in YAML configuration. Use logging.basicConfig() after initialization
+          'LoggingStore': LoggingStore, # Non-default logger option is unsupported in YAML configuration. Use logging.basicConfig(...) after initialization
+          'ExceptionLoggingStore': ExceptionLoggingStore, # Non-default logger option is unsupported in YAML configuration. Use logging.basicConfig(...) after initialization
           'TransformingStore': TransformingStore,
           'TextEncodingStore': TextEncodingStore,
           'GzipStore': GzipStore,
