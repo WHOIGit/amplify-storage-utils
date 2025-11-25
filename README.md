@@ -112,6 +112,8 @@ asyncio.run(main())
 
 ## YAML configuration
 
+### Writing the configuration
+
 As an alternative to using Python to define your store configurations, you can also use YAML to create a configuration schema. 
 
 Config files must define each store under "stores".
@@ -163,3 +165,15 @@ MirroringStores and their async equivalent have a list of base stores:
       - caching_store
       - text_encoding_store
 ```
+
+### Loading the configuration
+
+To build the stores from the configuration, use the `StoreFactory` class:
+
+```
+from storage.config_builder import StoreFactory
+
+store_factory = StoreFactory('example.yaml')
+store = store_factory.build()
+```
+The returned `store` object will be the store defined in the config by the "main" tag. 
