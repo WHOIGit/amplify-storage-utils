@@ -166,6 +166,15 @@ MirroringStores and their async equivalent have a list of base stores:
       - text_encoding_store
 ```
 
+To use environmental variables, specify them with the syntax ${variable}. To add a default value that's used when the environment variable is absent, use the syntax ${variable:-defaultval}. For example:
+```
+    config:
+      endpoint_url: http://test
+      s3_access_key: ${S3_ACCESS_KEY}
+      s3_secret_key: ${S3_SECRET_KEY}
+      bucket_name: ${BUCKET_NAME:-defaultbucket}
+```
+
 ### Loading the configuration
 
 To build the stores from the configuration, use the `StoreFactory` class:
