@@ -1,9 +1,12 @@
+import re
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from storage.config_builder import StoreFactory, ConfigError
 from mocks import MockS3
+
 
 @pytest.fixture
 def async_s3_store():
@@ -69,3 +72,20 @@ async def test_keys_with_prefix(async_s3_store):
 
     keys = [k async for k in async_s3_store.keys(prefix="x/")]
     assert set(keys) == {"x/1.txt", "x/2.txt"}
+
+
+@patch.dict('os.environ', {'VAR1': 'apple', 'VAR2': 'orange'})
+def test_parse_env_vars():
+    """ Test parsing environment variables in YAML. """
+    store = load_yaml(cfg("vars.yaml"))
+
+    assert store.get('item1') == 'apple' # variable present
+    assert store.get('item2') == 'orange' # variable present, default ignored 
+    assert store.get('item3') == 'blueberry' # variable present, default used
+
+
+def test_missing_env_var():
+    """ Ensure that missing env variables are caught. """
+    with pytest.raises(ConfigError, match=re.escape("Environment variable 'MISSING' not found. Please set MISSING or provide a default value using ${MISSING:-default}")):
+        load_yaml(cfg("missing_var.yaml"))
+    

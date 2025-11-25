@@ -1,0 +1,10 @@
+stores:
+  store1:
+    type: DictStore
+    config:
+      objects:
+        item1: ${VAR1}
+        item2: ${VAR2:-banana}
+        item3: ${VAR3:-blueberry}
+
+main: store1
