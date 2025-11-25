@@ -1,0 +1,44 @@
+stores:
+  store1:
+    type: DictStore
+
+  store2:
+    type: DictStore
+
+  backup_store:
+    type: DictStore
+    config:
+      objects:
+        item1: "apple"
+        item2: "orange"
+
+  url_store:
+    type: UrlEncodingStore
+    base: store1
+
+  hash_prefix_store:
+    type: HashPrefixStore
+    base: url_store
+    config:
+      hash_length: 10
+      separator: "/"
+
+  caching_store:
+    type: CachingStore
+    base:
+      main_store: hash_prefix_store
+      cache_store: backup_store
+
+  text_encoding_store:
+    type: TextEncodingStore
+    base: store2
+    config:
+      encoding: "utf-8"
+
+  mirror_store:
+    type: MirroringStore
+    base:
+      - caching_store
+      - text_encoding_store
+
+main: mirror_store

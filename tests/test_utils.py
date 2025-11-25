@@ -10,7 +10,7 @@ from storage.utils import (
     IdentityStore, NotifyingStore, ReadonlyStore, WriteonlyStore, MirroringStore,
     CachingStore, TransformingStore, TextEncodingStore, GzipStore,
     BufferStore, Base64Store, JsonStore, PrefixStore, UrlEncodingStore,
-    LoggingStore, ExceptionLoggingScore, KeyValidatingStore,
+    LoggingStore, ExceptionLoggingStore, KeyValidatingStore,
     UrlValidatingStore, HashPrefixStore, RegexValidatingStore,
     copy_store, clear_store, sync_stores
 )
@@ -285,7 +285,7 @@ class TestExceptionLoggingStore:
                 raise Exception("keys error")
         
         error_store = ErrorStore()
-        logging_store = ExceptionLoggingScore(error_store)
+        logging_store = ExceptionLoggingStore(error_store)
         
         # Test all operations handle exceptions
         logging_store.put(test_key, test_data)

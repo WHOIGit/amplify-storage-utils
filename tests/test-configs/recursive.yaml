@@ -1,0 +1,10 @@
+stores:
+  store0:
+    type: ReadonlyStore
+    base: store1
+
+  store1:
+    type: WriteonlyStore
+    base: store0
+
+main: store1

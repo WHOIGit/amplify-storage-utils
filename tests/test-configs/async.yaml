@@ -1,0 +1,10 @@
+stores:
+  async_store:
+    type: AsyncBucketStore
+    config:
+      endpoint_url: http://test
+      s3_access_key: X
+      s3_secret_key: Y
+      bucket_name: test-bucket
+
+main: async_store
