@@ -81,7 +81,7 @@ def test_parse_env_vars():
 
     assert store.get('item1') == 'apple' # variable present
     assert store.get('item2') == 'orange' # variable present, default ignored 
-    assert store.get('item3') == 'blueberry' # variable present, default used
+    assert store.get('item3') == 'blueberry' # variable absent, default used
 
 
 def test_missing_env_var():
