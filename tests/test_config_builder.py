@@ -88,4 +88,3 @@ def test_missing_env_var():
     """ Ensure that missing env variables are caught. """
     with pytest.raises(ConfigError, match=re.escape("Environment variable 'MISSING' not found. Please set MISSING or provide a default value using ${MISSING:-default}")):
         load_yaml(cfg("missing_var.yaml"))
-    
