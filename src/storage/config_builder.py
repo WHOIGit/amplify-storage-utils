@@ -129,6 +129,7 @@ class StoreFactory:
         config = self._resolve_values(config)
 
         base_config = store_def.get('base', {})
+        base_config = self._resolve_values(base_config)
         if base_config == {}:
             pass
         elif isinstance(base_config, dict):
