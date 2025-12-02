@@ -1,0 +1,12 @@
+stores:
+  store1:
+    type: DictStore
+    config:
+      objects:
+        nested:
+          list:
+            - static
+            - ${LIST_VAR:-list-default}
+            - deep: ${DEEP_VAR}
+
+main: store1

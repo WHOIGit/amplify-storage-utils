@@ -74,7 +74,7 @@ async def test_keys_with_prefix(async_s3_store):
     assert set(keys) == {"x/1.txt", "x/2.txt"}
 
 
-@patch.dict('os.environ', {'VAR1': 'apple', 'VAR2': 'orange'})
+@patch.dict('os.environ', {'VAR1': 'apple', 'VAR2': 'orange'}, clear=True)
 def test_parse_env_vars():
     """ Test parsing environment variables in YAML. """
     store = load_yaml(cfg("vars.yaml"))
@@ -82,6 +82,31 @@ def test_parse_env_vars():
     assert store.get('item1') == 'apple' # variable present
     assert store.get('item2') == 'orange' # variable present, default ignored 
     assert store.get('item3') == 'blueberry' # variable absent, default used
+
+
+@patch.dict("os.environ", {"EMPTY_VAR": ""}, clear=True)
+def test_empty_env_var_value():
+    """ Empty env values should not fall back to defaults. """
+    store = load_yaml(cfg("empty_vars.yaml"))
+
+    assert store.get("empty_value") == ""
+    assert store.get("missing_value") == "missing-default"
+
+
+def test_default_value_with_colons():
+    """ Defaults can include colons and punctuation. """
+    store = load_yaml(cfg("colon_default.yaml"))
+
+    assert store.get("url") == "http://localhost:8080/api:v1"
+
+
+@patch.dict("os.environ", {"DEEP_VAR": "deep", "LIST_VAR": "from-env"}, clear=True)
+def test_env_vars_in_nested_structures():
+    """ Ensure nested lists/dicts resolve environment variables. """
+    store = load_yaml(cfg("nested_vars.yaml"))
+    nested = store.get("nested")
+
+    assert nested["list"] == ["static", "from-env", {"deep": "deep"}]
 
 
 def test_missing_env_var():
