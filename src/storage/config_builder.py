@@ -109,8 +109,6 @@ class StoreFactory:
                 return env_value
 
         return values # return anything else (int, bool, etc.)
-       
-
     def build(self, store_name=None):
         """ 
         Build the store with the given name based on the YAML config. 
