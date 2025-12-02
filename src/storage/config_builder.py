@@ -1,4 +1,7 @@
+import os
+import re
 import yaml
+
 from .aiodb import AsyncSqliteStore
 from .aiofs import AsyncFilesystemStore, AsyncHashdirStore
 from .aioutils import AsyncFanoutStore, AsyncCachingStore
@@ -84,8 +87,28 @@ class StoreFactory:
         else:
             self._raise_invalid_base_config(store_type, type(base_config))
         return config
-       
 
+    def _resolve_values(self, values):
+        """ Resolve any references to environment variables. """
+        if isinstance(values, dict):
+            return {k: self._resolve_values(v) for k, v in values.items()}
+        elif isinstance(values, list):
+            return [self._resolve_values(item) for item in values]
+        elif isinstance(values, str):
+            match = re.match(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}$', values)
+            if match:
+                var_name = match.group(1)
+                default = match.group(3) # None if no default specified
+                env_value = os.environ.get(var_name)
+
+                if env_value is None:
+                    if default is not None:
+                        return default
+                    else:
+                        raise ConfigError(f"Environment variable '{var_name}' not found. Please set {var_name} or provide a default value using ${{{var_name}:-default}}")
+                return env_value
+
+        return values # return anything else (int, bool, etc.)
     def build(self, store_name=None):
         """ 
         Build the store with the given name based on the YAML config. 
@@ -103,8 +126,10 @@ class StoreFactory:
         store_class = self.STORES[store_type]
 
         config = store_def.get('config', {})
+        config = self._resolve_values(config)
 
         base_config = store_def.get('base', {})
+        base_config = self._resolve_values(base_config)
         if base_config == {}:
             pass
         elif isinstance(base_config, dict):

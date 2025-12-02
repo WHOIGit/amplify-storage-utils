@@ -1,0 +1,9 @@
+stores:
+  store1:
+    type: DictStore
+    config:
+      objects:
+        empty_value: ${EMPTY_VAR:-fallback}
+        missing_value: ${MISSING_VAR:-missing-default}
+
+main: store1
