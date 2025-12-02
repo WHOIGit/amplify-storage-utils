@@ -95,7 +95,7 @@ class StoreFactory:
         elif isinstance(values, list):
             return [self._resolve_values(item) for item in values]
         elif isinstance(values, str):
-            match = re.match(r'^\$\{([A-Z_][A-Z0-9_]*)(:-([^}]*))?\}$', values)
+            match = re.match(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}$', values)
             if match:
                 var_name = match.group(1)
                 default = match.group(3) # None if no default specified
