@@ -333,7 +333,58 @@ class Base64Store(TextEncodingStore):
     
     def reverse_transform(self, data):
         return b64decode(data)
-    
+
+
+class Base64TransmissionStore(TextEncodingStore):
+    """
+    Store that encodes data as base64 for responses,
+    and decodes input data from base64 for storage.
+    """
+
+    def transform(self, data):
+        return b64decode(data)
+
+    def reverse_transform(self, data):
+        return b64encode(data)
+
+
+class IfcbRoiStore(ReadonlyStore):
+    """
+    Readonly store for accessing IFCB ROI images and associated technical metadata.
+    """
+
+    @classmethod
+    def base64_store(cls, data_dir: str = "/data/ifcb") -> Base64Store:
+        """Create a Base64Store for IFCB ROI images."""
+        return Base64EncodingStore(cls(data_dir=data_dir))
+
+    def __init__(self, data_dir: str = "/data/ifcb"):
+        self.data_dir = data_dir
+
+    def get(self, key):
+        """Get ROI image and metadata by pid."""
+        pid = Pid(key)
+        bin_lid = pid.bin_lid
+        target_number = int(pid.target)
+        data_dir = DataDirectory(self.data_dir)
+        b = data_dir[bin_lid]
+        with b.as_single(target_number) as single_bin:
+            image_array = single_bin.images[target_number]
+            image_data = format_image(image_array, "image/png").getvalue()
+        print(f'retrieved {len(image_data)} bytes for pid {key}')
+        return image_data
+
+    def exists(self, key) -> bool:
+        """Check if ROI image exists for given pid."""
+        pid = Pid(key)
+        bin_lid = pid.bin_lid
+        target_number = int(pid.target)
+        data_dir = DataDirectory(self.data_dir)
+        if bin_lid not in data_dir:
+            return False
+        b = data_dir[bin_lid]
+        return target_number in b.images.keys()
+
 
 class JsonStore(TextEncodingStore):
 
