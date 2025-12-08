@@ -359,7 +359,7 @@ class IfcbRoiStore(ReadonlyStore):
     @classmethod
     def base64_store(cls, data_dir: str = "/data/ifcb") -> Base64Store:
         """Create a Base64Store for IFCB ROI images."""
-        return Base64EncodingStore(cls(data_dir=data_dir))
+        return Base64TransmissionStore(cls(data_dir=data_dir))
 
     def __init__(self, data_dir: str = "/data/ifcb"):
         self.data_dir = data_dir

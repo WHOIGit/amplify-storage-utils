@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from storage.config_builder import StoreFactory, ConfigError
+from storage.utils import Base64TransmissionStore
 from mocks import MockS3
 
 
@@ -158,3 +159,53 @@ def test_b64_roi_store(mock_pid, mock_data_dir, mock_format):
     mock_pid.assert_called_with("D20231015T123456_IFCB001_00005")
     mock_data_dir.assert_called_with("/placeholder/dir")
     mock_format.assert_called_with("fake_image_array", "image/png")
+
+
+@patch('storage.utils.format_image')
+@patch('storage.utils.DataDirectory')
+@patch('storage.utils.Pid')
+def test_ifcb_roi_base64_store_classmethod(mock_pid, mock_data_dir, mock_format):
+    """ Test the IfcbRoiStore.base64_store() class method. """
+    from base64 import b64encode, b64decode
+    from storage.utils import IfcbRoiStore, Base64Store
+
+    # Configure the same mocks as before
+    mock_pid_instance = MagicMock()
+    mock_pid_instance.bin_lid = "D20231015T123456_IFCB001"
+    mock_pid_instance.target = "5"
+    mock_pid.return_value = mock_pid_instance
+
+    test_png_data = b'iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAABHElEQVR4nO3YsQ0CMRAAQZtq6IeQkqiD8Pv5Cr4OciQsNiBAP5Nal6wusG5u+zE+u12fi9dtv59q9rJ4441YgViBWIFYgViBWIFYgVjBHOOxeP7Hf/bvZm1WIFYgViBWIFYgViBWIFYgVjDd4L+ftVmBWIFYgViBWIFYgViBWIFYgRt8mLVZgViBWIFYgViBWIFYgViBWIEbfJi1WYFYgViBWIFYgViBWIFYgViBG3yYtVmBWIFYgViBWIFYgViBWIFYgRt8mLVZgViBWIFYgViBWIFYgViBWIEbfJi1WYFYgViBWIFYgViBWIFYgViBG3yYtVmBWIFYgViBWIFYgViBWIFYgRt8mLVZgViBWIFYgViBWIFYgViBWMEL4p6WjTDs8dYAAAAASUVORK5CYII='
+    mock_buffer = MagicMock()
+    mock_buffer.getvalue.return_value = test_png_data
+    mock_format.return_value = mock_buffer
+
+    mock_single_bin = MagicMock()
+    mock_single_bin.images = {5: "fake_image_array"}
+
+    mock_bin = MagicMock()
+    mock_bin.as_single.return_value.__enter__.return_value = mock_single_bin
+    mock_bin.images.keys.return_value = [5, 10, 15]
+
+    mock_dir_instance = MagicMock()
+    mock_dir_instance.__getitem__.return_value = mock_bin
+    mock_dir_instance.__contains__.return_value = True
+    mock_data_dir.return_value = mock_dir_instance
+
+    # Call the class method
+    store = IfcbRoiStore.base64_store(data_dir="/test/data/ifcb")
+
+    # Verify it returns a Base64Store instance
+    assert isinstance(store, Base64TransmissionStore)
+
+    # Test that get returns base64-encoded data
+    # Note: Base64Store encodes for storage and decodes for retrieval
+    # So we need to pass b64-encoded data and expect decoded back
+    result = store.get("D20231015T123456_IFCB001_00005")
+
+    # Base64Store.get should decode the underlying PNG data
+    expected = b64encode(test_png_data)
+    assert result == expected
+
+    # Verify exists works
+    assert store.exists("D20231015T123456_IFCB001_00005") is True
