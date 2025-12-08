@@ -1,0 +1,11 @@
+stores:
+  ifcb_roi_store:
+    type: IfcbRoiStore
+    config:
+      data_dir: "/placeholder/dir"
+
+  ifcb_roi_b64_store:
+    type: Base64TransmissionStore
+    base: ifcb_roi_store
+
+main: ifcb_roi_b64_store
