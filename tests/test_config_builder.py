@@ -1,6 +1,7 @@
+from base64 import b64encode
 import re
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -113,3 +114,47 @@ def test_missing_env_var():
     """ Ensure that missing env variables are caught. """
     with pytest.raises(ConfigError, match=re.escape("Environment variable 'MISSING' not found. Please set MISSING or provide a default value using ${MISSING:-default}")):
         load_yaml(cfg("missing_var.yaml"))
+
+
+@patch('storage.utils.format_image')
+@patch('storage.utils.DataDirectory')
+@patch('storage.utils.Pid')
+def test_b64_roi_store(mock_pid, mock_data_dir, mock_format):
+    """ Confirm that Base64TransmissionStore and IFCBRoiStore function properly. """
+    # Configure PID mock
+    mock_pid_instance = Mock()
+    mock_pid_instance.bin_lid = "D20231015T123456_IFCB001"
+    mock_pid_instance.target = "5"
+    mock_pid.return_value = mock_pid_instance
+
+    # Configure format_image mock
+    test_png_data = b'iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAABHElEQVR4nO3YsQ0CMRAAQZtq6IeQkqiD8Pv5Cr4OciQsNiBAP5Nal6wusG5u+zE+u12fi9dtv59q9rJ4441YgViBWIFYgViBWIFYgVjBHOOxeP7Hf/bvZm1WIFYgViBWIFYgViBWIFYgVjDd4L+ftVmBWIFYgViBWIFYgViBWIFYgRt8mLVZgViBWIFYgViBWIFYgViBWIEbfJi1WYFYgViBWIFYgViBWIFYgViBG3yYtVmBWIFYgViBWIFYgViBWIFYgRt8mLVZgViBWIFYgViBWIFYgViBWIEbfJi1WYFYgViBWIFYgViBWIFYgViBG3yYtVmBWIFYgViBWIFYgViBWIFYgRt8mLVZgViBWIFYgViBWIFYgViBWMEL4p6WjTDs8dYAAAAASUVORK5CYII=' # placeholder checkerboard image
+    mock_buffer = Mock()
+    mock_buffer.getvalue.return_value = test_png_data
+    mock_format.return_value = mock_buffer
+
+    # Configure DataDirectory mock
+    mock_single_bin = MagicMock()
+    mock_single_bin.images = {5: "fake_image_array"}
+    
+    mock_bin = MagicMock()
+    mock_bin.as_single.return_value.__enter__.return_value = mock_single_bin
+    mock_bin.as_single.return_value.__exit__ = MagicMock(return_value=False)
+    mock_bin.images.keys.return_value = [5, 10, 15]
+
+    mock_dir_instance = MagicMock()
+    mock_dir_instance.__getitem__.return_value = mock_bin
+    mock_dir_instance.__contains__.return_value = True
+    mock_data_dir.return_value = mock_dir_instance
+
+    store = load_yaml(cfg("ifcb_roi.yaml"))
+
+    result = store.get("D20231015T123456_IFCB001_00005")
+    expected = b64encode(test_png_data)
+    assert result == expected
+
+    assert store.exists("D20231015T123456_IFCB001_00005") is True
+
+    mock_pid.assert_called_with("D20231015T123456_IFCB001_00005")
+    mock_data_dir.assert_called_with("/placeholder/dir")
+    mock_format.assert_called_with("fake_image_array", "image/png")

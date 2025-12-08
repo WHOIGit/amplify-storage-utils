@@ -20,6 +20,7 @@ dependencies = [
     'aiofiles',
     'aiosqlite',
     'pyyaml',
+    'pyifcb @ git+https://github.com/joefutrelle/pyifcb.git@v1.2.1',
 ]
 [project.optional-dependencies]
 test = [
@@ -29,6 +30,9 @@ test = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/storage"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [project.urls]
 Repository = "https://github.com/WHOIGit/amplify-storage-utils"

@@ -10,7 +10,7 @@ from .fs import FilesystemStore, HashdirStore
 from .mediastore import MediaStore
 from .object import DictStore
 from .s3 import BucketStore, AsyncBucketStore
-from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, ExceptionLoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, JsonStore, KeyTransformingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
+from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, ExceptionLoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, Base64TransmissionStore, IfcbRoiStore, JsonStore, KeyTransformingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
 
 class ConfigError(Exception):
     pass
@@ -45,6 +45,8 @@ class StoreFactory:
           'GzipStore': GzipStore,
           'BufferStore': BufferStore,
           'Base64Store': Base64Store,
+          'Base64TransmissionStore': Base64TransmissionStore,
+          'IfcbRoiStore': IfcbRoiStore,
           'JsonStore': JsonStore,
           'KeyTransformingStore': KeyTransformingStore,
           'PrefixStore': PrefixStore,
