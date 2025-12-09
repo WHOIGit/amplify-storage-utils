@@ -185,4 +185,39 @@ from storage.config_builder import StoreFactory
 store_factory = StoreFactory('example.yaml')
 store = store_factory.build()
 ```
-The returned `store` object will be the store defined in the config by the "main" tag. 
+The returned `store` object will be the store defined in the config by the "main" tag.
+
+### Custom stores
+
+You can register custom store classes to use in YAML configs with the `@register_store` decorator:
+
+```python
+from storage.config_builder import register_store
+from storage.object import ObjectStore
+
+@register_store
+class MyCustomStore(ObjectStore):
+    def __init__(self, custom_param, store):
+        self.custom_param = custom_param
+        self.store = store
+
+    def get(self, key):
+        # Custom logic here
+        return self.store.get(key)
+```
+
+Then reference it in your YAML config:
+
+```yaml
+stores:
+  base_store:
+    type: DictStore
+
+  custom_store:
+    type: MyCustomStore
+    config:
+      custom_param: value
+    base: base_store
+
+main: custom_store
+``` 
