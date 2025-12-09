@@ -7,6 +7,7 @@ import pytest
 
 from storage.config_builder import StoreFactory, ConfigError, register_store
 from storage.object import ObjectStore
+from storage.utils import ReadonlyStore
 
 from mocks import MockS3
 
@@ -154,6 +155,59 @@ main: amplify_store
         # Test functionality
         assert store.get("any_key") == b"amplify"
         assert store.exists("any_key") is True
+    finally:
+        # Clean up temp file
+        Path(yaml_path).unlink()
+
+
+def test_custom_store_with_params_inheriting_wrapper():
+    """Test custom store that inherits from a wrapper store and uses custom params."""
+    # Define a custom store that inherits from ReadonlyStore and adds a prefix
+    @register_store
+    class PrefixedReadonlyStore(ReadonlyStore):
+        """A readonly store that prepends a prefix to all retrieved data."""
+        def __init__(self, prefix, suffix, store):
+            super().__init__(store)
+            self.prefix = prefix
+            self.suffix = suffix
+
+        def get(self, key):
+            # Get data from wrapped store and add prefix/suffix
+            data = self.store.get(key)
+            return self.prefix.encode() + data + self.suffix.encode()
+
+    # Create a temporary YAML config
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write("""
+stores:
+  backend:
+    type: DictStore
+
+  prefixed:
+    type: PrefixedReadonlyStore
+    config:
+      prefix: "START:"
+      suffix: ":END"
+    base: backend
+
+main: prefixed
+""")
+        yaml_path = f.name
+
+    try:
+        # Load the store from YAML
+        store = load_yaml(yaml_path)
+
+        # Put some data (goes to backend since prefixed is readonly-wrapped)
+        store.store.put("test_key", b"data")
+
+        # Get should return data with prefix and suffix
+        result = store.get("test_key")
+        assert result == b"START:data:END"
+
+        # Verify it's readonly (put should raise)
+        with pytest.raises(Exception):
+            store.put("new_key", b"value")
     finally:
         # Clean up temp file
         Path(yaml_path).unlink()
