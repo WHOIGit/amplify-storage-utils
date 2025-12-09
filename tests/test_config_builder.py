@@ -1,10 +1,13 @@
 import re
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from storage.config_builder import StoreFactory, ConfigError
+from storage.config_builder import StoreFactory, ConfigError, register_store
+from storage.object import ObjectStore
+
 from mocks import MockS3
 
 
@@ -113,3 +116,44 @@ def test_missing_env_var():
     """ Ensure that missing env variables are caught. """
     with pytest.raises(ConfigError, match=re.escape("Environment variable 'MISSING' not found. Please set MISSING or provide a default value using ${MISSING:-default}")):
         load_yaml(cfg("missing_var.yaml"))
+
+
+def test_custom_store_registration():
+    """Test that custom stores can be registered and used in YAML configs."""
+    # Define a simple custom store
+    @register_store
+    class AmplifyStore(ObjectStore):
+        """A simple store that always returns 'amplify'."""
+        def get(self, key):
+            return b"amplify"
+
+        def put(self, key, data):
+            pass
+
+        def exists(self, key):
+            return True
+
+        def delete(self, key):
+            pass
+
+    # Create a temporary YAML config that uses the custom store
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write("""
+stores:
+  amplify_store:
+    type: AmplifyStore
+
+main: amplify_store
+""")
+        yaml_path = f.name
+
+    try:
+        # Load the store from YAML
+        store = load_yaml(yaml_path)
+
+        # Test functionality
+        assert store.get("any_key") == b"amplify"
+        assert store.exists("any_key") is True
+    finally:
+        # Clean up temp file
+        Path(yaml_path).unlink()
