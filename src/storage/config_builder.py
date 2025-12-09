@@ -111,18 +111,18 @@ class StoreFactory:
         raise ConfigError(f"Invalid base store configuration for {store_type}: base store definition is a {base_config_type}")
 
 
-    def _parse_dictionary_base(self, store_type, config, base_config):
+    def _parse_dictionary_base(self, store_class, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
-        if store_type == 'CachingStore' or store_type == 'AsyncCachingStore':
+        if issubclass(store_class, (CachingStore, AsyncCachingStore)):
             config['main_store'] = self.build(base_config['main_store'])
             config['cache_store'] = self.build(base_config['cache_store'])
         else:
             self._raise_invalid_base_config(store_type, type(base_config))
         return config
 
-    def _parse_list_base(self, store_type, config, base_config):
+    def _parse_list_base(self, store_class, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
-        if store_type == 'MirroringStore' or store_type == 'AsyncFanoutStore':
+        if issubclass(store_class, (MirroringStore, AsyncFanoutStore)):
             built_child_stores = []
             for child_store in base_config:
                 built_child_stores.append(self.build(child_store))
@@ -181,9 +181,9 @@ class StoreFactory:
         if base_config == {}:
             pass
         elif isinstance(base_config, dict):
-            config = self._parse_dictionary_base(store_type, config, base_config)
+            config = self._parse_dictionary_base(store_class, store_type, config, base_config)
         elif isinstance(base_config, list):
-            config = self._parse_list_base(store_type, config, base_config)
+            config = self._parse_list_base(store_class, store_type, config, base_config)
         elif isinstance(base_config, str):
             config['store'] = self.build(store_def['base'])
         else:
