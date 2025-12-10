@@ -38,9 +38,9 @@ class SqliteStore(ObjectStore):
     
     def delete(self, key):
         cursor = self.conn.execute('DELETE FROM objects WHERE key = ?', (key,))
+        self.conn.commit()
         if cursor.rowcount == 0:
             raise KeyError(key)
-        self.conn.commit()
 
     def keys(self):
         cursor = self.conn.execute('SELECT key FROM objects')

@@ -40,9 +40,9 @@ class AsyncSqliteStore(ObjectStore):
     
     async def delete(self, key):
         cursor = await self.conn.execute('DELETE FROM objects WHERE key = ?', (key,))
+        await self.conn.commit()
         if cursor.rowcount == 0:
             raise KeyError(key)
-        await self.conn.commit()
 
     async def keys(self):
         cursor = await self.conn.execute('SELECT key FROM objects')
