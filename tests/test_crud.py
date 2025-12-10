@@ -87,6 +87,11 @@ def test_delete(store):
     with pytest.raises(KeyError):
         store.get(key)
 
+    # Attempting to delete non-existent key should raise KeyError
+    with pytest.raises(KeyError):
+        store.delete(key)
+
+
 def test_update(store):
     """Test updating existing keys"""
     key = "test_update"

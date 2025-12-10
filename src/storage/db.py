@@ -37,7 +37,9 @@ class SqliteStore(ObjectStore):
         return cursor.fetchone() is not None
     
     def delete(self, key):
-        self.conn.execute('DELETE FROM objects WHERE key = ?', (key,))
+        cursor = self.conn.execute('DELETE FROM objects WHERE key = ?', (key,))
+        if cursor.rowcount == 0:
+            raise KeyError(key)
         self.conn.commit()
 
     def keys(self):
