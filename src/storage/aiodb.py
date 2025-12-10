@@ -39,8 +39,10 @@ class AsyncSqliteStore(ObjectStore):
         return (await cursor.fetchone()) is not None
     
     async def delete(self, key):
-        await self.conn.execute('DELETE FROM objects WHERE key = ?', (key,))
+        cursor = await self.conn.execute('DELETE FROM objects WHERE key = ?', (key,))
         await self.conn.commit()
+        if cursor.rowcount == 0:
+            raise KeyError(key)
 
     async def keys(self):
         cursor = await self.conn.execute('SELECT key FROM objects')
