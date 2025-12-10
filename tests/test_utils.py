@@ -9,7 +9,7 @@ from storage.object import DictStore
 from storage.utils import (
     DataTransformer, KeyTransformer, TransformingStore, KeyTransformingStore,
     IdentityStore, NotifyingStore, ReadonlyStore, WriteonlyStore, MirroringStore,
-    CachingStore, TransformingStore, TextEncodingStore, GzipStore,
+    CachingStore, TextEncodingStore, GzipStore,
     BufferStore, Base64Store, JsonStore, PrefixStore, UrlEncodingStore,
     LoggingStore, ExceptionLoggingStore, KeyValidatingStore,
     UrlValidatingStore, HashPrefixStore, RegexValidatingStore,
