@@ -8,12 +8,56 @@ from .aioutils import AsyncFanoutStore, AsyncCachingStore
 from .db import SqliteStore
 from .fs import FilesystemStore, HashdirStore
 from .mediastore import MediaStore
-from .object import DictStore
+from .object import DictStore, ObjectStore
 from .s3 import BucketStore, AsyncBucketStore
 from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, ExceptionLoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, JsonStore, KeyTransformingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
 
 class ConfigError(Exception):
     pass
+
+
+class StoreRegistry:
+    """
+    Registry for custom store classes.
+
+    Manages registration of custom ObjectStore implementations that can be
+    used in YAML configuration files alongside built-in store types.
+    """
+
+    def __init__(self):
+        """ Initialize an empty store registry. """
+        self._stores = {}
+
+    def register(self, cls):
+        """ Register a store class. """
+        if not issubclass(cls, ObjectStore):
+            raise TypeError(f"{cls.__name__} must inherit from ObjectStore to be registered as a store")
+
+        store_name = cls.__name__
+
+        if store_name in self._stores:
+            raise ValueError(f"Store '{store_name}' is already registered")
+
+        self._stores[store_name] = cls
+        return cls
+
+    def get(self, name):
+        """ Get a store class by name. """
+        return self._stores.get(name)
+
+
+# Default global registry instance
+_default_registry = StoreRegistry()
+
+
+def register_store(cls):
+    """
+    Decorator to register a custom store class for use in YAML configs.
+
+    The store will be registered using its class name and can then be
+    referenced in YAML configuration files.
+    """
+    return _default_registry.register(cls)
 
 
 class StoreFactory:
@@ -67,19 +111,18 @@ class StoreFactory:
         raise ConfigError(f"Invalid base store configuration for {store_type}: base store definition is a {base_config_type}")
 
 
-    def _parse_dictionary_base(self, store_type, config, base_config):
+    def _parse_dictionary_base(self, store_class, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
-        if store_type == 'CachingStore' or store_type == 'AsyncCachingStore':
+        if issubclass(store_class, (CachingStore, AsyncCachingStore)):
             config['main_store'] = self.build(base_config['main_store'])
             config['cache_store'] = self.build(base_config['cache_store'])
         else:
             self._raise_invalid_base_config(store_type, type(base_config))
         return config
 
-
-    def _parse_list_base(self, store_type, config, base_config):
+    def _parse_list_base(self, store_class, store_type, config, base_config):
         """ Parse the given base config and add it to the general config. """
-        if store_type == 'MirroringStore' or store_type == 'AsyncFanoutStore':
+        if issubclass(store_class, (MirroringStore, AsyncFanoutStore)):
             built_child_stores = []
             for child_store in base_config:
                 built_child_stores.append(self.build(child_store))
@@ -109,6 +152,7 @@ class StoreFactory:
                 return env_value
 
         return values # return anything else (int, bool, etc.)
+
     def build(self, store_name=None):
         """ 
         Build the store with the given name based on the YAML config. 
@@ -120,10 +164,14 @@ class StoreFactory:
         if store_name in self.built_stores:
             raise ConfigError(f"Recursive store definition found -- {store_name} mentioned multiple times")
         self.built_stores[store_name] = True
-        
+
         store_def = self.stores[store_name]
         store_type = store_def['type']
-        store_class = self.STORES[store_type]
+
+        # Look up store class from built-in stores or registered custom stores
+        store_class = self.STORES.get(store_type) or _default_registry.get(store_type)
+        if store_class is None:
+            raise ConfigError(f"Unknown store type: '{store_type}'. Store must be a built-in type or registered using @register_store")
 
         config = store_def.get('config', {})
         config = self._resolve_values(config)
@@ -133,9 +181,9 @@ class StoreFactory:
         if base_config == {}:
             pass
         elif isinstance(base_config, dict):
-            config = self._parse_dictionary_base(store_type, config, base_config)
+            config = self._parse_dictionary_base(store_class, store_type, config, base_config)
         elif isinstance(base_config, list):
-            config = self._parse_list_base(store_type, config, base_config)
+            config = self._parse_list_base(store_class, store_type, config, base_config)
         elif isinstance(base_config, str):
             config['store'] = self.build(store_def['base'])
         else:
