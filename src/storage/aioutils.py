@@ -133,7 +133,7 @@ class AsyncTextEncodingStore(AsyncTransformingStore):
     """
 
     def __init__(self, store, encoding='utf-8'):
-        super().__init__(store, TextEncodingTransformer(encoding))
+        super().__init__(store, TextEncodingTransformer(encoding), sync_transform=False)
 
 
 class AsyncGzipStore(AsyncTransformingStore):
@@ -142,7 +142,7 @@ class AsyncGzipStore(AsyncTransformingStore):
     """
 
     def __init__(self, store):
-        super().__init__(store, GzipTransformer())
+        super().__init__(store, GzipTransformer(), sync_transform=False)
 
 
 class AsyncBufferStore(AsyncTransformingStore):
@@ -160,7 +160,7 @@ class AsyncBase64Store(AsyncTransformingStore):
     """
 
     def __init__(self, store):
-        super().__init__(store, Base64Transformer())
+        super().__init__(store, Base64Transformer(), sync_transform=False)
 
 
 class AsyncJsonStore(AsyncTransformingStore):
@@ -169,7 +169,7 @@ class AsyncJsonStore(AsyncTransformingStore):
     """
 
     def __init__(self, store):
-        super().__init__(store, JsonTransformer())
+        super().__init__(store, JsonTransformer(), sync_transform=False)
 
 
 class AsyncKeyTransformingStore(ObjectStore):
