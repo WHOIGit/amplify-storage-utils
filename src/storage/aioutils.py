@@ -1,3 +1,5 @@
+import asyncio
+
 from storage.object import ObjectStore
 from storage.utils import (
     RegexValidator,
@@ -94,16 +96,25 @@ class AsyncTransformingStore(ObjectStore):
     and the reverse transformation after retrieving it.
     """
 
-    def __init__(self, store, transformer=None):
+    def __init__(self, store, transformer=None, sync_transform=True):
         self.store = store
         self.transformer = transformer or DataTransformer()
+        # set sync_transform to False if the transform/reverse_transform methods are CPU-bound (e.g., compression)
+        self.sync_transform = sync_transform
 
     async def put(self, key, data):
-        await self.store.put(key, self.transformer.transform(data))
+        if self.sync_transform:
+            transformed_data = self.transformer.transform(data)
+        else:
+            transformed_data = await asyncio.to_thread(self.transformer.transform, data)
+        await self.store.put(key, transformed_data)
 
     async def get(self, key):
         data = await self.store.get(key)
-        return self.transformer.reverse_transform(data)
+        if self.sync_transform:
+            return self.transformer.reverse_transform(data)
+        else:
+            return await asyncio.to_thread(self.transformer.reverse_transform, data)
 
     async def exists(self, key):
         return await self.store.exists(key)
