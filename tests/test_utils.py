@@ -7,6 +7,7 @@ import logging
 import re
 from storage.object import DictStore
 from storage.utils import (
+    DataTransformer, KeyTransformer, TransformingStore, KeyTransformingStore,
     IdentityStore, NotifyingStore, ReadonlyStore, WriteonlyStore, MirroringStore,
     CachingStore, TransformingStore, TextEncodingStore, GzipStore,
     BufferStore, Base64Store, JsonStore, PrefixStore, UrlEncodingStore,
@@ -154,19 +155,42 @@ class TestCachingStore:
 
 class TestTransformingStore:
     def test_basic_transform(self, store, test_key, test_data):
-        class UppercaseStore(TransformingStore):
+
+        class UppercaseTransformer(DataTransformer):
             def transform(self, data):
                 return data.upper()
             
             def reverse_transform(self, data):
                 return data.lower()
         
-        transform_store = UppercaseStore(store)
+        transform_store = TransformingStore(store, UppercaseTransformer())
         test_str = b"hello world"
         
         transform_store.put(test_key, test_str)
         assert store.get(test_key) == b"HELLO WORLD"
         assert transform_store.get(test_key) == b"hello world"
+
+
+class TestKeyTransformingStore:
+    def test_key_transformation(self, store, test_key, test_data):
+        class ReverseKeyTransformer(KeyTransformer):
+            def transform_key(self, key):
+                return key[::-1]
+            
+            def reverse_transform_key(self, key):
+                return key[::-1]
+        
+        key_transform_store = KeyTransformingStore(store, ReverseKeyTransformer())
+        
+        key_transform_store.put(test_key, test_data)
+        reversed_key = test_key[::-1]
+        assert store.exists(reversed_key)
+        assert key_transform_store.get(test_key) == test_data
+        assert key_transform_store.exists(test_key)
+        
+        key_transform_store.delete(test_key)
+        assert not store.exists(reversed_key)
+
 
 class TestTextEncodingStore:
     def test_text_encoding(self, store, test_key):

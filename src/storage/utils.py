@@ -253,122 +253,221 @@ class ExceptionLoggingStore(LoggingStore):
             return []
         
 
-class TransformingStore(ObjectStore):
-    """
-    A store that applies a transformation to data before storing it
-    and a reverse transformation after retrieving it.
-    """
-
-    def __init__(self, store):
-        self.store = store
+class DataTransformer:
+    """Base data transformer: bytes/objects in, bytes/objects out."""
 
     def transform(self, data):
-        return data # no-op
+        return data
 
     def reverse_transform(self, data):
-        return data # no-op
-    
-    def put(self, key, data):
-        self.store.put(key, self.transform(data))
+        return data
 
-    def get(self, key):
-        return self.reverse_transform(self.store.get(key))
-    
-    def exists(self, key):
-        return self.store.exists(key)
-    
-    def delete(self, key):
-        return self.store.delete(key)
-    
-    def keys(self):
-        return self.store.keys()
-    
 
-class TextEncodingStore(TransformingStore):
-    """
-    Store that encodes and decodes data as text
-    """
-
-    def __init__(self, store, encoding='utf-8'):
-        super().__init__(store)
+class TextEncodingTransformer(DataTransformer):
+    def __init__(self, encoding='utf-8'):
         self.encoding = encoding
 
     def transform(self, data):
         return data.encode(self.encoding)
-    
+
     def reverse_transform(self, data):
         return data.decode(self.encoding)
-    
 
-class GzipStore(TransformingStore):
 
+class GzipTransformer(DataTransformer):
     def transform(self, data):
         return gzip.compress(data)
-    
+
     def reverse_transform(self, data):
         return gzip.decompress(data)
 
 
-class BufferStore(TransformingStore):
-    """
-    Store that provides a buffer interface for a backing store
-    """
+class BufferTransformer(DataTransformer):
+    """Transform between file-like buffers and raw bytes."""
 
     def transform(self, buffer):
         return buffer.read()
-    
+
     def reverse_transform(self, data):
         b = BytesIO(data)
         b.seek(0)
         return b
-    
 
-class Base64Store(TextEncodingStore):
-    """
-    Store that encodes and decodes data as base64
-    """
 
+class Base64Transformer(DataTransformer):
     def transform(self, data):
         return b64encode(data)
-    
+
     def reverse_transform(self, data):
         return b64decode(data)
-    
 
-class JsonStore(TextEncodingStore):
 
+class JsonTransformer(DataTransformer):
     def transform(self, data):
         return json.dumps(data)
-    
+
     def reverse_transform(self, data):
         return json.loads(data)
-    
+
+
+class TransformingStore(ObjectStore):
+    """
+    A store that applies a DataTransformer to data before storing it
+    and the reverse transformation after retrieving it.
+    """
+
+    def __init__(self, store, transformer=None):
+        self.store = store
+        self.transformer = transformer or DataTransformer()
+
+    def put(self, key, data):
+        self.store.put(key, self.transformer.transform(data))
+
+    def get(self, key):
+        return self.transformer.reverse_transform(self.store.get(key))
+
+    def exists(self, key):
+        return self.store.exists(key)
+
+    def delete(self, key):
+        return self.store.delete(key)
+
+    def keys(self):
+        return self.store.keys()
+
+
+class TextEncodingStore(TransformingStore):
+    """
+    Store that encodes and decodes data as text.
+    """
+
+    def __init__(self, store, encoding='utf-8'):
+        super().__init__(store, TextEncodingTransformer(encoding))
+
+
+class GzipStore(TransformingStore):
+    """
+    Store that gzips data on write and ungzips on read.
+    """
+
+    def __init__(self, store):
+        super().__init__(store, GzipTransformer())
+
+
+class BufferStore(TransformingStore):
+    """
+    Store that provides a buffer interface for a backing store.
+    """
+
+    def __init__(self, store):
+        super().__init__(store, BufferTransformer())
+
+
+class Base64Store(TransformingStore):
+    """
+    Store that encodes and decodes data as base64.
+    """
+
+    def __init__(self, store):
+        super().__init__(store, Base64Transformer())
+
+
+class JsonStore(TransformingStore):
+    """
+    Store that serializes/deserializes JSON-compatible Python objects.
+    """
+
+    def __init__(self, store):
+        super().__init__(store, JsonTransformer())
+
 
 # key-based transformations
 
-class KeyTransformingStore(ObjectStore):
-
-    def __init__(self, store):
-        self.store = store
+class KeyTransformer:
+    """Base key transformer."""
 
     def transform_key(self, key):
-        return key # no-op
-    
+        return key
+
     def reverse_transform_key(self, key):
-        return key # no-op
-    
+        return key
+
+
+class ValidatingKeyTransformer(KeyTransformer):
+    """Applies a validator that either returns None or raises KeyError."""
+
+    def __init__(self, validator):
+        self.validator = validator
+
+    def transform_key(self, key):
+        self.validator(key)
+        return key
+
+
+class PrefixKeyTransformer(KeyTransformer):
+    def __init__(self, prefix):
+        self.prefix = prefix
+
+    def transform_key(self, key):
+        return self.prefix + key
+
+    def reverse_transform_key(self, key):
+        return key[len(self.prefix):]
+
+
+class HashPrefixKeyTransformer(KeyTransformer):
+    def __init__(self, hash_length=8, separator='/'):
+        self.hash_length = hash_length
+        self.separator = separator
+
+    def transform_key(self, key):
+        hash_prefix = hashlib.sha256(key.encode()).hexdigest()[:self.hash_length]
+        return hash_prefix + self.separator + key
+
+    def reverse_transform_key(self, key):
+        return key[self.hash_length + len(self.separator):]
+
+
+class UrlEncodingKeyTransformer(KeyTransformer):
+    """
+    Handles URL encoding and decoding of keys while preserving
+    hierarchical structure (slashes).
+    """
+
+    def transform_key(self, key):
+        parts = key.split('/')
+        encoded_parts = [quote(part, safe='') for part in parts]
+        return '/'.join(encoded_parts)
+
+    def reverse_transform_key(self, key):
+        parts = key.split('/')
+        decoded_parts = [unquote(part) for part in parts]
+        return '/'.join(decoded_parts)
+
+
+class KeyTransformingStore(ObjectStore):
+    def __init__(self, store, transformer=None):
+        self.store = store
+        self.transformer = transformer or KeyTransformer()
+
+    def transform_key(self, key):
+        return self.transformer.transform_key(key)
+
+    def reverse_transform_key(self, key):
+        return self.transformer.reverse_transform_key(key)
+
     def put(self, key, data):
         self.store.put(self.transform_key(key), data)
 
     def get(self, key):
         return self.store.get(self.transform_key(key))
-    
+
     def exists(self, key):
         return self.store.exists(self.transform_key(key))
-    
+
     def delete(self, key):
         return self.store.delete(self.transform_key(key))
-    
+
     def keys(self):
         return (self.reverse_transform_key(key) for key in self.store.keys())
 
@@ -376,17 +475,11 @@ class KeyTransformingStore(ObjectStore):
 class KeyValidatingStore(KeyTransformingStore):
     """
     Store that validates keys using a validator, which either returns
-    None or raise KeyError.
+    None or raises KeyError.
     """
 
     def __init__(self, store, validator):
-        super().__init__(store)
-        self.validator = validator
-
-
-    def transform_key(self, key):
-        self.validator(key)
-        return key
+        super().__init__(store, ValidatingKeyTransformer(validator))
 
 
 class RegexValidator:
@@ -429,33 +522,16 @@ class PrefixStore(KeyTransformingStore):
     """
 
     def __init__(self, store, prefix):
-        super().__init__(store)
-        self.prefix = prefix
-
-    def transform_key(self, key):
-        return self.prefix + key
-
-    def reverse_transform_key(self, key):
-        return key[len(self.prefix):]
+        super().__init__(store, PrefixKeyTransformer(prefix))
 
 
 class HashPrefixStore(KeyTransformingStore):
+    """
+    Store that adds a hash-derived prefix to keys.
+    """
 
     def __init__(self, store, hash_length=8, separator='/'):
-        self.store = store
-        self.hash_length = hash_length
-        self.separator = separator
-
-    def transform_key(self, key):
-        hash_prefix = hashlib.sha256(key.encode()).hexdigest()[:self.hash_length]
-        return hash_prefix + self.separator + key
-
-    def reverse_transform_key(self, key):
-        return key[self.hash_length + len(self.separator):]
-    
-    def keys(self):
-        for key in self.store.keys():
-            yield self.reverse_transform_key(key)
+        super().__init__(store, HashPrefixKeyTransformer(hash_length, separator))
 
 
 class UrlEncodingStore(KeyTransformingStore):
@@ -463,19 +539,10 @@ class UrlEncodingStore(KeyTransformingStore):
     A store that handles URL encoding and decoding of keys while preserving
     hierarchical structure (slashes).
     """
-    
-    def transform_key(self, key):
-        # Split by slashes and encode each part separately
-        parts = key.split('/')
-        encoded_parts = [quote(part, safe='') for part in parts]
-        return '/'.join(encoded_parts)
-    
-    def reverse_transform_key(self, key):
-        # Split by slashes and decode each part separately
-        parts = key.split('/')
-        decoded_parts = [unquote(part) for part in parts]
-        return '/'.join(decoded_parts)
-    
+
+    def __init__(self, store):
+        super().__init__(store, UrlEncodingKeyTransformer())
+
 
 # utility functions for multi-store actions
 
