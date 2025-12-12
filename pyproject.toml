@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amplify-storage-utils"
-version = "1.2.0"
+version = "1.3.2"
 description = "Object storage utilities"
 readme = "README.md"
 authors = [{name = "Joe Futrelle", email = "jfutrelle@whoi.edu"}]
