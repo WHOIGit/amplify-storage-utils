@@ -79,8 +79,6 @@ class StoreFactory:
           'HashdirStore': HashdirStore,
           'MediaStore': MediaStore,
           'DictStore': DictStore,
-          'BucketStore': BucketStore,
-          'AsyncBucketStore': AsyncBucketStore,
           'IdentityStore': IdentityStore,
           'ReadonlyStore': ReadonlyStore,
           'WriteonlyStore': WriteonlyStore,
@@ -102,6 +100,13 @@ class StoreFactory:
           'UrlValidatingStore': UrlValidatingStore,
           'RegexValidatingStore': RegexValidatingStore,
       }
+
+    # insert BucketStore and AsyncBucketStore only if s3 support is available
+    try:
+        STORES['BucketStore'] = BucketStore
+        STORES['AsyncBucketStore'] = AsyncBucketStore
+    except NameError:
+        pass
 
     def __init__(self, config_path):
         """ Load the given yaml config file. """
