@@ -15,14 +15,16 @@ classifiers = [
 ]
 keywords = ['storage']
 dependencies = [
-    'boto3',
-    'aiobotocore',
     'aiofiles',
     'aiosqlite',
     'pyyaml',
     'requests'
 ]
 [project.optional-dependencies]
+s3 = [
+  "boto3",
+  "aiobotocore"
+]
 test = [
   "pytest>=8.0",
   "pytest-asyncio"
