@@ -16,7 +16,7 @@ Concrete implementations of the `ObjectStore` interface are provided for various
 - Filesystem (`FilesystemStore`)
 - Filesystem with hashed directory structure (`HashdirStore`)
 - SQLite database (`SqliteStore`)
-- S3-compatible object storage (`BucketStore`)
+- S3-compatible object storage (`BucketStore`) (note: only available if the optional "s3" dependencies are installed)
 - Zip files (`ZipStore`)
 
 `asyncio` based implementations are available for some of these backends.
@@ -97,7 +97,7 @@ with SqliteStore('/path/to/db.sqlite') as store:
     data = store.get('my_object_key')
 ```
 
-The `AsyncBucketStore` class provides an asynchronous interface for S3-compatible object storage. It can be used with the asyncio library:
+The `AsyncBucketStore` class provides an asynchronous interface for S3-compatible object storage. It can be used with the asyncio library (note: this requires installing the optional "s3" imports):
 
 ```python
 from storage.s3 import AsyncBucketStore
