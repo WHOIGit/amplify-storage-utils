@@ -9,8 +9,13 @@ from .db import SqliteStore
 from .fs import FilesystemStore, HashdirStore
 from .mediastore import MediaStore
 from .object import DictStore, ObjectStore
-from .s3 import BucketStore, AsyncBucketStore
 from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, ExceptionLoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, JsonStore, KeyTransformingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
+
+# import s3 related stores only if s3 support is available
+try:
+    from .s3 import BucketStore, AsyncBucketStore
+except ImportError:
+    pass
 
 class ConfigError(Exception):
     pass
