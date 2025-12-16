@@ -88,17 +88,14 @@ class HashdirStore(KeyTransformingStore):
 
 
 class FilesystemKeyTransformer(KeyTransformer):
-    # Windows reserved filenames (case-insensitive, no extension)
-    WINDOWS_RESERVED = {
-        "CON", "PRN", "AUX", "NUL",
-        *(f"COM{i}" for i in range(1, 10)),
-        *(f"LPT{i}" for i in range(1, 10)),
-    }
 
     def transform_key(self, key: str) -> str:
         """
         Transform an arbitrary Unicode key into a reversible, filesystem-safe filename.
         """
+        if not key:
+            raise ValueError("Key cannot be empty")
+    
         # Encode key → UTF-8 → Base32
         b = key.encode("utf-8")
         encoded = base64.b32encode(b).decode("ascii")
@@ -106,24 +103,6 @@ class FilesystemKeyTransformer(KeyTransformer):
         # Replace '=' padding with underscores
         encoded = encoded.rstrip("=")
         encoded = encoded + "_" * ((8 - len(encoded) % 8) % 8)
-
-        # Avoid leading dot on UNIX-like systems
-        if encoded.startswith("."):
-            encoded = "_" + encoded
-
-        # Avoid empty filename (should never happen, but for safety)
-        if not encoded:
-            encoded = "_"
-
-        # Avoid Windows trailing dot/space
-        encoded = encoded.rstrip(" .")
-        if not encoded:
-            encoded = "_"
-
-        # Avoid Windows reserved filenames
-        bare = encoded.upper().rstrip("_")
-        if bare in self.WINDOWS_RESERVED:
-            encoded = "_" + encoded
 
         return encoded
 
