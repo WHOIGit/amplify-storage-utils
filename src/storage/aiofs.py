@@ -4,8 +4,9 @@ import aiofiles
 
 from aiofiles import os as aios
 
+from storage.aioutils import AsyncKeyTransformingStore
 from storage.object import ObjectStore
-from storage.fs import hashpath
+from storage.fs import hashpath, FilesystemKeyTransformer
 
 
 class AsyncFilesystemStore(ObjectStore):
@@ -59,3 +60,10 @@ class AsyncHashdirStore(AsyncFilesystemStore):
 
     def keys(self):
         raise NotImplementedError("HashdirStore does not support listing keys")
+
+
+class AsyncSafeFilesystemStore(AsyncKeyTransformingStore):
+    def __init__(self, root_path):
+        fs_store = AsyncFilesystemStore(root_path)
+        transformer = FilesystemKeyTransformer()
+        super().__init__(fs_store, transformer)

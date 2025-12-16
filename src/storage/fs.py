@@ -1,8 +1,10 @@
 import os
 import hashlib
+import base64
+import re
 
 from storage.object import ObjectStore
-from storage.utils import KeyTransformingStore
+from storage.utils import KeyTransformingStore, KeyTransformer
 
 
 class FilesystemStore(ObjectStore):
@@ -83,3 +85,52 @@ class HashdirStore(KeyTransformingStore):
         """HashdirStore does not support listing keys since the transformation
         cannot be reversed."""
         raise NotImplementedError
+
+
+class FilesystemKeyTransformer(KeyTransformer):
+
+    def transform_key(self, key: str) -> str:
+        """
+        Transform an arbitrary Unicode key into a reversible, filesystem-safe filename.
+        """
+        if not key:
+            raise ValueError("Key cannot be empty")
+    
+        # Encode key → UTF-8 → Base32
+        b = key.encode("utf-8")
+        encoded = base64.b32encode(b).decode("ascii")
+
+        # Replace '=' padding with underscores
+        encoded = encoded.rstrip("=")
+        encoded = encoded + "_" * ((8 - len(encoded) % 8) % 8)
+
+        return encoded
+
+    def reverse_transform_key(self, filename: str) -> str:
+        """
+        Reverse-transform a filename produced by transform_key() back to the original Unicode key.
+        """
+        # Undo artificial prefix to avoid Windows reserved names
+        if filename.startswith("_"):
+            possible_original = filename[1:]
+            bare = possible_original.upper().rstrip("_")
+            if bare in self.WINDOWS_RESERVED:
+                filename = possible_original
+
+        # Convert trailing underscores → '=' (Base32 padding)
+        match = re.match(r"(.*?)(_*)$", filename)
+        stripped, underscores = match.groups()
+        pad_count = len(underscores)
+        encoded = stripped + ("=" * pad_count)
+
+        # Decode Base32 → UTF-8 → Unicode
+        decoded_bytes = base64.b32decode(encoded)
+        return decoded_bytes.decode("utf-8")
+
+
+# a filesystem store that uses FilesystemKeyTransformer
+class SafeFilesystemStore(KeyTransformingStore):
+    def __init__(self, root_path):
+        fs_store = FilesystemStore(root_path)
+        transformer = FilesystemKeyTransformer()
+        super().__init__(fs_store, transformer)
