@@ -18,6 +18,7 @@ from storage.utils import (
     ValidatingKeyTransformer,
     validate_http_url_key,
 )
+from storage.fs import FilesystemKeyTransformer
 
 
 class MemoryStore:
@@ -246,3 +247,23 @@ def test_key_transforming_store_applies_transform_and_reverse_on_keys_iteration(
     store.delete("a/b")
     assert store.exists("a/b") is False
     assert backing.exists("p/a/b") is False
+
+
+def test_safe_filesystem_key_transformer_replaces_invalid_chars():
+    t = FilesystemKeyTransformer()
+    INVALID_KEYS = [
+        "inva|id:key/with*chars?.txt",
+        "another\\bad<key>.txt",
+        "COM2",
+        ".hidden",
+        "trailingdot.",
+        "trailing spacce ",
+        "The ünicode/key/测试.txt",
+    ]
+    for key in INVALID_KEYS:
+        transformed = t.transform_key(key)
+        # Reverse transformation should yield the original key
+        assert t.reverse_transform_key(transformed) == key
+    # now make sure empty key raises ValueError
+    with pytest.raises(ValueError):
+        t.transform_key("")
