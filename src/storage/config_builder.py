@@ -3,13 +3,14 @@ import re
 import yaml
 
 from .aiodb import AsyncSqliteStore
-from .aiofs import AsyncFilesystemStore, AsyncHashdirStore
-from .aioutils import AsyncFanoutStore, AsyncCachingStore
+from .aiofs import AsyncFilesystemStore, AsyncSafeFilesystemStore, AsyncHashdirStore
+from .aioutils import AsyncFanoutStore, AsyncCachingStore, AsyncTextEncodingStore, AsyncGzipStore, AsyncBufferStore, AsyncBase64Store, AsyncJsonStore, AsyncUrlValidatingStore, AsyncRegexValidatingStore, AsyncPrefixStore, AsyncHashPrefixStore, AsyncUrlEncodingStore
 from .db import SqliteStore
-from .fs import FilesystemStore, HashdirStore
+from .fs import FilesystemStore, SafeFilesystemStore, HashdirStore
 from .mediastore import MediaStore
 from .object import DictStore, ObjectStore
 from .utils import IdentityStore, ReadonlyStore, WriteonlyStore, MirroringStore, CachingStore, NotifyingStore, LoggingStore, ExceptionLoggingStore, TransformingStore, TextEncodingStore, GzipStore, BufferStore, Base64Store, JsonStore, KeyTransformingStore, UrlValidatingStore, RegexValidatingStore, PrefixStore, HashPrefixStore, UrlEncodingStore
+from .zip import ZipStore
 
 # import s3 related stores only if s3 support is available
 try:
@@ -71,14 +72,27 @@ class StoreFactory:
     STORES = {
           'AsyncSqliteStore': AsyncSqliteStore,
           'AsyncFilesystemStore': AsyncFilesystemStore,
+          'AsyncSafeFilesystemStore': AsyncSafeFilesystemStore,
           'AsyncHashdirStore': AsyncHashdirStore,
           'AsyncFanoutStore': AsyncFanoutStore,
           'AsyncCachingStore': AsyncCachingStore,
+          'AsyncTextEncodingStore': AsyncTextEncodingStore,
+          'AsyncGzipStore': AsyncGzipStore,
+          'AsyncBufferStore': AsyncBufferStore,
+          'AsyncBase64Store': AsyncBase64Store,
+          'AsyncJsonStore': AsyncJsonStore,
+          'AsyncUrlValidatingStore': AsyncUrlValidatingStore,
+          'AsyncRegexValidatingStore': AsyncRegexValidatingStore,
+          'AsyncPrefixStore': AsyncPrefixStore,
+          'AsyncHashPrefixStore': AsyncHashPrefixStore,
+          'AsyncUrlEncodingStore': AsyncUrlEncodingStore,
           'SqliteStore': SqliteStore,
           'FilesystemStore': FilesystemStore,
+          'SafeFilesystemStore': SafeFilesystemStore,
           'HashdirStore': HashdirStore,
           'MediaStore': MediaStore,
           'DictStore': DictStore,
+          'ZipStore': ZipStore,
           'IdentityStore': IdentityStore,
           'ReadonlyStore': ReadonlyStore,
           'WriteonlyStore': WriteonlyStore,

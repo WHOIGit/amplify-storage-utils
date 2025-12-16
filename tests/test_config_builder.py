@@ -338,3 +338,481 @@ main: metrics_cache
     finally:
         # Clean up temp file
         Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_safe_filesystem_store():
+    """Test AsyncSafeFilesystemStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  async_fs:
+    type: AsyncSafeFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+main: async_fs
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+
+            assert await store.put("test/key.txt", b"data") is None
+            assert await store.exists("test/key.txt") is True
+            assert await store.get("test/key.txt") == b"data"
+            assert await store.delete("test/key.txt") is True
+            assert await store.exists("test/key.txt") is False
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_safe_filesystem_store_unsafe_keys():
+    """Test AsyncSafeFilesystemStore handles unsafe filesystem keys."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  async_fs:
+    type: AsyncSafeFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+main: async_fs
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+
+            unsafe_keys = [
+                "inva|id:key/with*chars?.txt",
+                "another\\bad<key>.txt",
+                "COM2",
+                ".hidden",
+                "trailingdot.",
+                "trailing space ",
+                "The ünicode/key/测试.txt",
+            ]
+
+            for key in unsafe_keys:
+                await store.put(key, b"data")
+                assert await store.exists(key) is True
+                assert await store.get(key) == b"data"
+
+            # Verify keys() returns original keys
+            retrieved_keys = {k async for k in store.keys()}
+            assert retrieved_keys == set(unsafe_keys)
+
+            # Clean up
+            for key in unsafe_keys:
+                assert await store.delete(key) is True
+                assert await store.exists(key) is False
+        finally:
+            Path(yaml_path).unlink()
+
+
+def test_safe_filesystem_store():
+    """Test SafeFilesystemStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  safe_fs:
+    type: SafeFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+main: safe_fs
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+
+            store.put("test/key.txt", b"data")
+            assert store.exists("test/key.txt") is True
+            assert store.get("test/key.txt") == b"data"
+            assert store.delete("test/key.txt") is True
+            assert store.exists("test/key.txt") is False
+        finally:
+            Path(yaml_path).unlink()
+
+
+def test_safe_filesystem_store_unsafe_keys():
+    """Test SafeFilesystemStore handles unsafe filesystem keys."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  safe_fs:
+    type: SafeFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+main: safe_fs
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+
+            unsafe_keys = [
+                "inva|id:key/with*chars?.txt",
+                "another\\bad<key>.txt",
+                "COM2",
+                ".hidden",
+                "trailingdot.",
+                "trailing space ",
+                "The ünicode/key/测试.txt",
+            ]
+
+            for key in unsafe_keys:
+                store.put(key, b"data")
+                assert store.exists(key) is True
+                assert store.get(key) == b"data"
+
+            # Verify keys() returns original keys
+            retrieved_keys = set(store.keys())
+            assert retrieved_keys == set(unsafe_keys)
+
+            # Clean up
+            for key in unsafe_keys:
+                assert store.delete(key) is True
+                assert store.exists(key) is False
+        finally:
+            Path(yaml_path).unlink()
+
+
+def test_zip_store():
+    """Test ZipStore configured via YAML."""
+    with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmpzip:
+        zip_path = tmpzip.name
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        f.write(f"""
+stores:
+  zip:
+    type: ZipStore
+    config:
+      path: {zip_path}
+
+main: zip
+""")
+        yaml_path = f.name
+
+    try:
+        store = load_yaml(yaml_path)
+        with store:
+            store.put("file.txt", b"content")
+            assert store.exists("file.txt") is True
+            assert store.get("file.txt") == b"content"
+    finally:
+        Path(yaml_path).unlink()
+        Path(zip_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_text_encoding_store():
+    """Test AsyncTextEncodingStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  text_encoding:
+    type: AsyncTextEncodingStore
+    config:
+      encoding: utf-8
+    base: backend
+
+main: text_encoding
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("key", "hello")
+            assert await store.get("key") == "hello"
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_gzip_store():
+    """Test AsyncGzipStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  gzip:
+    type: AsyncGzipStore
+    base: backend
+
+main: gzip
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("key", b"uncompressed data")
+            result = await store.get("key")
+            assert result == b"uncompressed data"
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_buffer_store():
+    """Test AsyncBufferStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  buffer:
+    type: AsyncBufferStore
+    base: backend
+
+main: buffer
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            from io import BytesIO
+            await store.put("key", BytesIO(b"data"))
+            result = await store.get("key")
+            assert result.read() == b"data"
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_base64_store():
+    """Test AsyncBase64Store configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  base64:
+    type: AsyncBase64Store
+    base: backend
+
+main: base64
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("key", b"binary data")
+            assert await store.get("key") == b"binary data"
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_json_store():
+    """Test AsyncJsonStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  fs:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  text:
+    type: AsyncTextEncodingStore
+    base: fs
+
+  json:
+    type: AsyncJsonStore
+    base: text
+
+main: json
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            data = {"name": "test", "value": 123}
+            await store.put("key", data)
+            assert await store.get("key") == data
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_url_validating_store():
+    """Test AsyncUrlValidatingStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncHashdirStore
+    config:
+      root_path: {tmpdir}
+
+  url_validating:
+    type: AsyncUrlValidatingStore
+    base: backend
+
+main: url_validating
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("https://example.com/file", b"data")
+            assert await store.get("https://example.com/file") == b"data"
+
+            with pytest.raises(KeyError):
+                await store.put("invalid-url", b"data")
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_regex_validating_store():
+    """Test AsyncRegexValidatingStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  regex_validating:
+    type: AsyncRegexValidatingStore
+    config:
+      pattern: "^[a-z]+$"
+    base: backend
+
+main: regex_validating
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("validkey", b"data")
+            assert await store.get("validkey") == b"data"
+
+            with pytest.raises(KeyError):
+                await store.put("Invalid123", b"data")
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_prefix_store():
+    """Test AsyncPrefixStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncHashdirStore
+    config:
+      root_path: {tmpdir}
+
+  prefix:
+    type: AsyncPrefixStore
+    config:
+      prefix: "test/"
+    base: backend
+
+main: prefix
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("key", b"data")
+            assert await store.get("key") == b"data"
+            assert await store.store.exists("test/key")
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_hash_prefix_store():
+    """Test AsyncHashPrefixStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncHashdirStore
+    config:
+      root_path: {tmpdir}
+
+  hash_prefix:
+    type: AsyncHashPrefixStore
+    config:
+      hash_length: 4
+      separator: "/"
+    base: backend
+
+main: hash_prefix
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("mykey", b"data")
+            assert await store.get("mykey") == b"data"
+        finally:
+            Path(yaml_path).unlink()
+
+
+@pytest.mark.asyncio
+async def test_async_url_encoding_store():
+    """Test AsyncUrlEncodingStore configured via YAML."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  backend:
+    type: AsyncFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+  url_encoding:
+    type: AsyncUrlEncodingStore
+    base: backend
+
+main: url_encoding
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+            await store.put("key with spaces", b"data")
+            assert await store.get("key with spaces") == b"data"
+        finally:
+            Path(yaml_path).unlink()
