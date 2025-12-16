@@ -368,6 +368,52 @@ main: async_fs
             Path(yaml_path).unlink()
 
 
+@pytest.mark.asyncio
+async def test_async_safe_filesystem_store_unsafe_keys():
+    """Test AsyncSafeFilesystemStore handles unsafe filesystem keys."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  async_fs:
+    type: AsyncSafeFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+main: async_fs
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+
+            unsafe_keys = [
+                "inva|id:key/with*chars?.txt",
+                "another\\bad<key>.txt",
+                "COM2",
+                ".hidden",
+                "trailingdot.",
+                "trailing space ",
+                "The ünicode/key/测试.txt",
+            ]
+
+            for key in unsafe_keys:
+                await store.put(key, b"data")
+                assert await store.exists(key) is True
+                assert await store.get(key) == b"data"
+
+            # Verify keys() returns original keys
+            retrieved_keys = {k async for k in store.keys()}
+            assert retrieved_keys == set(unsafe_keys)
+
+            # Clean up
+            for key in unsafe_keys:
+                assert await store.delete(key) is True
+                assert await store.exists(key) is False
+        finally:
+            Path(yaml_path).unlink()
+
+
 def test_safe_filesystem_store():
     """Test SafeFilesystemStore configured via YAML."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -391,6 +437,51 @@ main: safe_fs
             assert store.get("test/key.txt") == b"data"
             assert store.delete("test/key.txt") is True
             assert store.exists("test/key.txt") is False
+        finally:
+            Path(yaml_path).unlink()
+
+
+def test_safe_filesystem_store_unsafe_keys():
+    """Test SafeFilesystemStore handles unsafe filesystem keys."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(f"""
+stores:
+  safe_fs:
+    type: SafeFilesystemStore
+    config:
+      root_path: {tmpdir}
+
+main: safe_fs
+""")
+            yaml_path = f.name
+
+        try:
+            store = load_yaml(yaml_path)
+
+            unsafe_keys = [
+                "inva|id:key/with*chars?.txt",
+                "another\\bad<key>.txt",
+                "COM2",
+                ".hidden",
+                "trailingdot.",
+                "trailing space ",
+                "The ünicode/key/测试.txt",
+            ]
+
+            for key in unsafe_keys:
+                store.put(key, b"data")
+                assert store.exists(key) is True
+                assert store.get(key) == b"data"
+
+            # Verify keys() returns original keys
+            retrieved_keys = set(store.keys())
+            assert retrieved_keys == set(unsafe_keys)
+
+            # Clean up
+            for key in unsafe_keys:
+                assert store.delete(key) is True
+                assert store.exists(key) is False
         finally:
             Path(yaml_path).unlink()
 
