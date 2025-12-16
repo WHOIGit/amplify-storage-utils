@@ -27,11 +27,13 @@ def hashdir_store():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield HashdirStore(tmpdir)
 
+
 # Main parametrized fixture that uses the individual store fixtures
 @pytest.fixture(params=['dict_store', 'sqlite_store', 'filesystem_store', 'hashdir_store'])
 def store(request):
     """Main fixture that provides different store implementations"""
     return request.getfixturevalue(request.param)
+
 
 def test_put_and_get(store):
     """Test basic put and get operations"""

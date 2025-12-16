@@ -327,6 +327,22 @@ class TestAsyncUrlValidatingStore:
             await url_store.put("ftp://example.com", test_data)
 
 
+class TestAsyncSafeFilesystemStore:
+    async def test_safe_filesystem_store(self, tmp_path, test_key, test_data):
+        from storage.aiofs import AsyncSafeFilesystemStore
+
+        store = AsyncSafeFilesystemStore(str(tmp_path))
+
+        # test that keys with arbitrary Unicode characters round-trip
+        complex_key = "path/with Spaces/特殊字符/and#special&chars"
+        await store.put(complex_key, test_data)
+        assert await store.get(complex_key) == test_data
+        assert await store.exists(complex_key)
+
+        keys = [k async for k in store.keys()]
+        assert keys == [complex_key]
+
+
 async def test_async_copy_store(test_data):
     source = AsyncDictStore()
     target = AsyncDictStore()
