@@ -124,8 +124,11 @@ class FilesystemKeyTransformer(KeyTransformer):
         encoded = stripped + ("=" * pad_count)
 
         # Decode Base32 → UTF-8 → Unicode
-        decoded_bytes = base64.b32decode(encoded)
-        return decoded_bytes.decode("utf-8")
+        try:
+            decoded_bytes = base64.b32decode(encoded)
+            return decoded_bytes.decode("utf-8")
+        except (base64.binascii.Error, UnicodeDecodeError) as e:
+            raise ValueError(f"Invalid filename for reverse transformation: {filename}") from e
 
 
 # a filesystem store that uses FilesystemKeyTransformer
