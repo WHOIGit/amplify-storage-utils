@@ -469,7 +469,12 @@ class KeyTransformingStore(ObjectStore):
         return self.store.delete(self.transform_key(key))
 
     def keys(self):
-        return (self.reverse_transform_key(key) for key in self.store.keys())
+        # skip any keys whose reverse transformation fails
+        for key in self.store.keys():
+            try:
+                yield self.reverse_transform_key(key)
+            except ValueError:
+                continue
 
 
 class KeyValidatingStore(KeyTransformingStore):

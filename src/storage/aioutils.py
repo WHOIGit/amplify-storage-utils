@@ -200,8 +200,12 @@ class AsyncKeyTransformingStore(ObjectStore):
         return await self.store.delete(self.transform_key(key))
 
     async def keys(self):
+        # skip any keys where reverse transformation fails
         async for key in self.store.keys():
-            yield self.reverse_transform_key(key)
+            try:
+                yield self.reverse_transform_key(key)
+            except ValueError:
+                continue
 
 
 class AsyncKeyValidatingStore(AsyncKeyTransformingStore):
