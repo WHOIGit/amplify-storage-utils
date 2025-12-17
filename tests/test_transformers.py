@@ -267,3 +267,14 @@ def test_safe_filesystem_key_transformer_replaces_invalid_chars():
     # now make sure empty key raises ValueError
     with pytest.raises(ValueError):
         t.transform_key("")
+
+def test_safe_filesystem_key_transformer_raises_on_invalid_reverse():
+    t = FilesystemKeyTransformer()
+    # create an invalid filename that cannot be reverse-transformed
+    invalid_filenames = [
+        "!!!invalid_base32$$$",
+        "normal_but_invalid_padding_",
+    ]
+    for filename in invalid_filenames:
+        with pytest.raises(ValueError):
+            t.reverse_transform_key(filename)
