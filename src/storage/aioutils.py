@@ -1,4 +1,6 @@
 import asyncio
+import sys
+from contextlib import AsyncExitStack
 
 from storage.object import ObjectStore
 from storage.utils import (
@@ -22,17 +24,24 @@ from storage.utils import (
 class AsyncFanoutStore(ObjectStore):
     def __init__(self, children):
         self.children = children
+        self._exit_stack = None
 
     async def __aenter__(self):
-        for i, child in enumerate(self.children):
-            if hasattr(child, '__aenter__'):
-                self.children[i] = await child.__aenter__()
-        return self
+        self._exit_stack = AsyncExitStack()
+        await self._exit_stack.__aenter__()
+        try:
+            for i, child in enumerate(self.children):
+                if hasattr(child, '__aenter__'):
+                    self.children[i] = await self._exit_stack.enter_async_context(child)
+            return self
+        except:
+            # If any child fails to enter, close all previously entered children
+            await self._exit_stack.__aexit__(*sys.exc_info())
+            raise
 
     async def __aexit__(self, exc_type, exc, tb):
-        for child in self.children:
-            if hasattr(child, '__aexit__'):
-                await child.__aexit__(exc_type, exc, tb)
+        if self._exit_stack is not None:
+            await self._exit_stack.__aexit__(exc_type, exc, tb)
 
     async def put(self, key, data):
         for child in self.children:
@@ -68,19 +77,25 @@ class AsyncCachingStore(ObjectStore):
     def __init__(self, main_store, cache_store):
         self.main_store = main_store
         self.cache_store = cache_store
+        self._exit_stack = None
 
     async def __aenter__(self):
-        if hasattr(self.main_store, '__aenter__'):
-            self.main_store = await self.main_store.__aenter__()
-        if hasattr(self.cache_store, '__aenter__'):
-            self.cache_store = await self.cache_store.__aenter__()
-        return self
+        self._exit_stack = AsyncExitStack()
+        await self._exit_stack.__aenter__()
+        try:
+            if hasattr(self.main_store, '__aenter__'):
+                self.main_store = await self._exit_stack.enter_async_context(self.main_store)
+            if hasattr(self.cache_store, '__aenter__'):
+                self.cache_store = await self._exit_stack.enter_async_context(self.cache_store)
+            return self
+        except:
+            # If cache store fails to enter, ensure main store is closed
+            await self._exit_stack.__aexit__(*sys.exc_info())
+            raise
 
     async def __aexit__(self, exc_type, exc, tb):
-        if hasattr(self.main_store, '__aexit__'):
-            await self.main_store.__aexit__(exc_type, exc, tb)
-        if hasattr(self.cache_store, '__aexit__'):
-            await self.cache_store.__aexit__(exc_type, exc, tb)
+        if self._exit_stack is not None:
+            await self._exit_stack.__aexit__(exc_type, exc, tb)
 
     async def put(self, key, data):
         await self.main_store.put(key, data)

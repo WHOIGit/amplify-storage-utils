@@ -505,3 +505,56 @@ class TestAsyncContextManagers:
 
         # Verify the connection was properly closed
         assert base_store.conn is None
+
+    async def test_fanout_store_partial_failure_cleanup(self):
+        """Test that AsyncFanoutStore cleans up already-entered stores if a later store fails."""
+
+        class FailingStore:
+            """Store that fails during __aenter__."""
+            async def __aenter__(self):
+                raise RuntimeError("Failed to initialize")
+
+            async def __aexit__(self, exc_type, exc, tb):
+                pass
+
+        store1 = AsyncContextTrackingStore()
+        store2 = AsyncContextTrackingStore()
+        failing_store = FailingStore()
+
+        fanout = AsyncFanoutStore([store1, store2, failing_store])
+
+        # Try to enter the fanout store - should fail
+        with pytest.raises(RuntimeError, match="Failed to initialize"):
+            async with fanout:
+                pass
+
+        # Verify that store1 and store2 were entered AND then exited (cleaned up)
+        assert store1.entered
+        assert store1.exited  # This is the key - cleanup happened!
+        assert store2.entered
+        assert store2.exited  # This is the key - cleanup happened!
+
+    async def test_caching_store_partial_failure_cleanup(self):
+        """Test that AsyncCachingStore cleans up main_store if cache_store fails."""
+
+        class FailingStore:
+            """Store that fails during __aenter__."""
+            async def __aenter__(self):
+                raise RuntimeError("Cache unavailable")
+
+            async def __aexit__(self, exc_type, exc, tb):
+                pass
+
+        main_store = AsyncContextTrackingStore()
+        cache_store = FailingStore()
+
+        caching = AsyncCachingStore(main_store, cache_store)
+
+        # Try to enter the caching store - should fail
+        with pytest.raises(RuntimeError, match="Cache unavailable"):
+            async with caching:
+                pass
+
+        # Verify that main_store was entered AND then exited (cleaned up)
+        assert main_store.entered
+        assert main_store.exited  # This is the key - cleanup happened!
