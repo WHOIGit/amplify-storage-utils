@@ -11,12 +11,16 @@ class HttpStore:
     def get(self, key):
         try:
             response = requests.get(key)
-            if response.status_code == 200:
-                return response.content
-            if response.status_code == 404:
-                raise KeyError(key)
         except Exception as e:
-            raise StoreError(f"HTTP error occurred: {e}") from e
+            raise StoreError(f"HTTP request failed for key {key}") from e
+        if response.status_code == 200:
+            return response.content
+        if response.status_code == 404:
+            raise KeyError(key)
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            raise StoreError(f"HTTP error occurred: {response.status_code}") from e
     
     def put(self, key, data):
         raise NotImplementedError("HttpStore does not support put operation.")
@@ -47,15 +51,20 @@ class AsyncHttpStore:
     async def get(self, key):
         import aiohttp
         async with aiohttp.ClientSession() as session:
-            async with session.get(key) as response:
-                if response.status == 200:
-                    return await response.read()
-                if response.status == 404:
-                    raise KeyError(key)
-                try:
-                    response.raise_for_status()
-                except Exception as e:
-                    raise StoreError(f"HTTP error occurred: {response.status}") from e
+            try:
+                async with session.get(key) as response:
+                    if response.status == 200:
+                        return await response.read()
+                    if response.status == 404:
+                        raise KeyError(key)
+                    try:
+                        response.raise_for_status()
+                    except Exception as e:
+                        raise StoreError(f"HTTP error occurred: {response.status}") from e
+            except KeyError:
+                raise
+            except Exception as e:
+                raise StoreError(f"HTTP request failed for key {key}") from e
             
     async def put(self, key, data):
         raise NotImplementedError("AsyncHttpStore does not support put operation.")
