@@ -81,8 +81,3 @@ class DictStore(ObjectStore):
 class StoreError(Exception):
     """Base class for exceptions in this module."""
     pass
-
-
-class StoreConnectionError(StoreError):
-    """Exception raised for errors in the connection to the store."""
-    pass

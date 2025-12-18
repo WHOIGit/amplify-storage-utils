@@ -80,12 +80,19 @@ class AsyncHttpStore:
         import aiohttp
         async with aiohttp.ClientSession() as session:
             async with session.head(key) as response:
-                if response.status == 200:
-                    return True
-                elif response.status in (404, 405):
-                    async with session.get(key) as get_response:
-                        return get_response.status == 200
-                return False
+                try:
+                    status = response.status
+                    if status == 200:
+                        return True
+                    elif status == 405:  # Method Not Allowed
+                        try:
+                            async with session.get(key) as get_response:
+                                return get_response.status == 200
+                        except Exception as e:
+                            raise StoreError(f"HTTP request failed for key {key}") from e
+                    return False
+                except Exception as e:
+                    raise StoreError(f"HTTP request failed for key {key}") from e
             
     async def delete(self, key):
         raise NotImplementedError("AsyncHttpStore does not support delete operation.")
