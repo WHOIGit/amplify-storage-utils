@@ -76,3 +76,8 @@ class DictStore(ObjectStore):
 
     def keys(self):
         return self.objects.keys()
+
+
+class StoreError(Exception):
+    """Base class for exceptions in this module."""
+    pass
