@@ -27,12 +27,18 @@ class HttpStore:
     
     def exists(self, key):
         """attempts HEAD, if that 404s, tries GET as fallback"""
-        response = requests.head(key)
+        try:
+            response = requests.head(key)
+        except Exception as e:
+            raise StoreError(f"HTTP request failed for key {key}") from e
         status = response.status_code
         if status == 200:
             return True
-        elif status in (404, 405):
-            response = requests.get(key)
+        elif status == 405:  # Method Not Allowed
+            try:
+                response = requests.get(key)
+            except Exception as e:
+                raise StoreError(f"HTTP request failed for key {key}") from e
             return response.status_code == 200
         return False
     
