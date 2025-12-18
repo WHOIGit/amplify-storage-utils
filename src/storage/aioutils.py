@@ -23,6 +23,17 @@ class AsyncFanoutStore(ObjectStore):
     def __init__(self, children):
         self.children = children
 
+    async def __aenter__(self):
+        for i, child in enumerate(self.children):
+            if hasattr(child, '__aenter__'):
+                self.children[i] = await child.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        for child in self.children:
+            if hasattr(child, '__aexit__'):
+                await child.__aexit__(exc_type, exc, tb)
+
     async def put(self, key, data):
         for child in self.children:
             await child.put(key, data)
@@ -57,6 +68,19 @@ class AsyncCachingStore(ObjectStore):
     def __init__(self, main_store, cache_store):
         self.main_store = main_store
         self.cache_store = cache_store
+
+    async def __aenter__(self):
+        if hasattr(self.main_store, '__aenter__'):
+            self.main_store = await self.main_store.__aenter__()
+        if hasattr(self.cache_store, '__aenter__'):
+            self.cache_store = await self.cache_store.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if hasattr(self.main_store, '__aexit__'):
+            await self.main_store.__aexit__(exc_type, exc, tb)
+        if hasattr(self.cache_store, '__aexit__'):
+            await self.cache_store.__aexit__(exc_type, exc, tb)
 
     async def put(self, key, data):
         await self.main_store.put(key, data)
@@ -101,6 +125,15 @@ class AsyncTransformingStore(ObjectStore):
         self.transformer = transformer or DataTransformer()
         # set sync_transform to False if the transform/reverse_transform methods are CPU-bound (e.g., compression)
         self.sync_transform = sync_transform
+
+    async def __aenter__(self):
+        if hasattr(self.store, '__aenter__'):
+            self.store = await self.store.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if hasattr(self.store, '__aexit__'):
+            await self.store.__aexit__(exc_type, exc, tb)
 
     async def put(self, key, data):
         if self.sync_transform:
@@ -180,6 +213,15 @@ class AsyncKeyTransformingStore(ObjectStore):
     def __init__(self, store, transformer=None):
         self.store = store
         self.transformer = transformer or KeyTransformer()
+
+    async def __aenter__(self):
+        if hasattr(self.store, '__aenter__'):
+            self.store = await self.store.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if hasattr(self.store, '__aexit__'):
+            await self.store.__aexit__(exc_type, exc, tb)
 
     def transform_key(self, key):
         return self.transformer.transform_key(key)

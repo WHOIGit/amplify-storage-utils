@@ -53,6 +53,22 @@ class AsyncDictStore:
             yield key
 
 
+class AsyncContextTrackingStore(AsyncDictStore):
+    """Async store that tracks context manager calls."""
+
+    def __init__(self):
+        super().__init__()
+        self.entered = False
+        self.exited = False
+
+    async def __aenter__(self):
+        self.entered = True
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.exited = True
+
+
 @pytest.fixture
 def store():
     return AsyncDictStore()
@@ -394,3 +410,98 @@ async def test_async_sync_stores(test_data):
     target_keys = {k async for k in target.keys()}
     source_keys = {k async for k in source.keys()}
     assert target_keys == source_keys
+
+
+class TestAsyncContextManagers:
+    """Tests that verify wrapper stores properly propagate async context manager calls."""
+
+    async def test_prefix_store_context_manager(self, test_key, test_data):
+        base_store = AsyncContextTrackingStore()
+        prefix_store = AsyncPrefixStore(base_store, "prefix/")
+
+        assert not base_store.entered
+        assert not base_store.exited
+
+        async with prefix_store as store:
+            assert base_store.entered
+            assert not base_store.exited
+            await store.put(test_key, test_data)
+
+        assert base_store.entered
+        assert base_store.exited
+
+    async def test_transforming_store_context_manager(self, test_key, test_data):
+        base_store = AsyncContextTrackingStore()
+        transform_store = AsyncGzipStore(base_store)
+
+        assert not base_store.entered
+        assert not base_store.exited
+
+        async with transform_store as store:
+            assert base_store.entered
+            assert not base_store.exited
+            await store.put(test_key, test_data)
+
+        assert base_store.entered
+        assert base_store.exited
+
+    async def test_fanout_store_context_manager(self, test_key, test_data):
+        child1 = AsyncContextTrackingStore()
+        child2 = AsyncContextTrackingStore()
+        child3 = AsyncContextTrackingStore()
+        fanout_store = AsyncFanoutStore([child1, child2, child3])
+
+        assert not child1.entered and not child2.entered and not child3.entered
+
+        async with fanout_store as store:
+            assert child1.entered and child2.entered and child3.entered
+            assert not child1.exited and not child2.exited and not child3.exited
+            await store.put(test_key, test_data)
+
+        assert child1.exited and child2.exited and child3.exited
+
+    async def test_caching_store_context_manager(self, test_key, test_data):
+        main_store = AsyncContextTrackingStore()
+        cache_store = AsyncContextTrackingStore()
+        caching_store = AsyncCachingStore(main_store, cache_store)
+
+        assert not main_store.entered and not cache_store.entered
+
+        async with caching_store as store:
+            assert main_store.entered and cache_store.entered
+            assert not main_store.exited and not cache_store.exited
+            await store.put(test_key, test_data)
+
+        assert main_store.exited and cache_store.exited
+
+    async def test_nested_wrapper_context_manager(self, test_key, test_data):
+        """Test that nested wrappers properly propagate context manager calls."""
+        base_store = AsyncContextTrackingStore()
+        prefix_store = AsyncPrefixStore(base_store, "prefix/")
+        gzip_store = AsyncGzipStore(prefix_store)
+
+        assert not base_store.entered
+
+        async with gzip_store as store:
+            assert base_store.entered
+            await store.put(test_key, test_data)
+
+        assert base_store.exited
+
+    async def test_prefix_store_with_sqlite(self, tmp_path, test_key, test_data):
+        """Test AsyncPrefixStore wrapping AsyncSqliteStore."""
+        from storage.aiodb import AsyncSqliteStore
+
+        db_path = str(tmp_path / "test.db")
+        base_store = AsyncSqliteStore(db_path)
+        prefix_store = AsyncPrefixStore(base_store, "prefix/")
+
+        async with prefix_store as store:
+            # Should be able to perform operations without error
+            await store.put(test_key, test_data)
+            assert await store.exists(test_key)
+            retrieved = await store.get(test_key)
+            assert retrieved == test_data
+
+        # Verify the connection was properly closed
+        assert base_store.conn is None
