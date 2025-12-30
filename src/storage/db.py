@@ -42,6 +42,7 @@ class SqliteStore(ObjectStore):
         if cursor.rowcount == 0:
             raise KeyError(key)
 
-    def keys(self):
+    def keys(self, **kwargs):
+        # SqliteStore ignores kwargs - returns all keys
         cursor = self.conn.execute('SELECT key FROM objects')
         return [row[0] for row in cursor.fetchall()]

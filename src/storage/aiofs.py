@@ -37,7 +37,7 @@ class AsyncFilesystemStore(ObjectStore):
         except FileNotFoundError:
             raise KeyError(key)
 
-    async def keys(self):
+    async def keys(self, **kwargs):
         for dirpath, _, filenames in os.walk(self.root_path):
             for filename in filenames:
                 yield os.path.relpath(os.path.join(dirpath, filename), self.root_path)
@@ -58,7 +58,7 @@ class AsyncHashdirStore(AsyncFilesystemStore):
         async with aiofiles.open(path, 'wb') as f:
             await f.write(data)
 
-    def keys(self):
+    def keys(self, **kwargs):
         raise NotImplementedError("HashdirStore does not support listing keys")
 
 
