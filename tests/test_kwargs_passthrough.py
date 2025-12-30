@@ -82,4 +82,4 @@ if __name__ == "__main__":
     test_dictstore_kwargs()
     test_transforming_store_kwargs()
     test_nested_transforming_stores()
-    print("\n✅ All tests passed!")
+    print("\nAll tests passed!")
