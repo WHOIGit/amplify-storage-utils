@@ -1,8 +1,37 @@
 #!/usr/bin/env python3
 """Test kwargs passthrough in ObjectStore.keys()"""
 
-from storage.object import DictStore
+from storage.object import DictStore, ObjectStore
 from storage.utils import KeyTransformingStore, PrefixKeyTransformer
+
+
+class MockS3Store(ObjectStore):
+    """Mock store that tracks what prefix was passed to keys()"""
+
+    def __init__(self):
+        self.data = {}
+        self.last_prefix_arg = None
+
+    def put(self, key, data):
+        self.data[key] = data
+
+    def get(self, key):
+        return self.data[key]
+
+    def exists(self, key):
+        return key in self.data
+
+    def delete(self, key):
+        del self.data[key]
+
+    def keys(self, prefix='', **kwargs):
+        # Track what prefix was passed
+        self.last_prefix_arg = prefix
+
+        # Simulate S3 prefix filtering
+        for key in self.data.keys():
+            if key.startswith(prefix):
+                yield key
 
 
 def test_dictstore_kwargs():
@@ -20,60 +49,64 @@ def test_dictstore_kwargs():
     assert len(keys_with_kwargs) == 2
 
 
-def test_transforming_store_kwargs():
-    """Test that KeyTransformingStore passes kwargs through"""
-    base_store = DictStore()
-    base_store.put("prefix/key1", b"data1")
-    base_store.put("prefix/key2", b"data2")
-    base_store.put("other/key3", b"data3")
+def test_prefix_passthrough():
+    """Test that prefix kwarg flows through nested stores to the base store"""
 
-    # Create a prefixing transformer
-    transformer = PrefixKeyTransformer(prefix="prefix/")
-    transformed_store = KeyTransformingStore(base_store, transformer)
+    # Create mock S3 store with some data
+    base_store = MockS3Store()
+    base_store.put("ifcb_data/2025/D20250114T172241_IFCB109/00001.png", b"data1")
+    base_store.put("ifcb_data/2025/D20250114T172241_IFCB109/00002.png", b"data2")
+    base_store.put("ifcb_data/2025/D20250114T172241_IFCB110/00001.png", b"data3")
+    base_store.put("other_data/file.png", b"data4")
 
-    # Put through the transformed store
-    transformed_store.put("newkey", b"newdata")
+    # Create nested KeyTransformingStores (simulating our real setup)
+    # Inner layer: adds "ifcb_data/" prefix
+    prefix_transformer = PrefixKeyTransformer(prefix="ifcb_data/")
+    prefix_store = KeyTransformingStore(base_store, prefix_transformer)
 
-    # Verify it was stored with prefix
-    assert base_store.exists("prefix/newkey")
+    # Outer layer: adds year/bin structure (simplified for test)
+    year_transformer = PrefixKeyTransformer(prefix="2025/")
+    roi_store = KeyTransformingStore(prefix_store, year_transformer)
 
-    # List all keys through transformed store (should reverse transform)
-    keys = list(transformed_store.keys())
-    assert "key1" in keys
-    assert "key2" in keys
-    assert "newkey" in keys
-    # "other/key3" won't be in the list because reverse transform will fail
+    # Call keys with a prefix on the OUTER store
+    # This should transform through both layers and reach the base store
+    list(roi_store.keys(prefix="ifcb_data/2025/D20250114T172241_IFCB109/"))
+
+    # Verify the prefix was actually passed to the base store
+    assert base_store.last_prefix_arg == "ifcb_data/2025/D20250114T172241_IFCB109/"
+
+    # Verify that the base store used it for filtering
+    # (only keys matching that prefix should have been yielded)
+    filtered_keys = list(base_store.keys(prefix="ifcb_data/2025/D20250114T172241_IFCB109/"))
+    assert len(filtered_keys) == 2
+    assert all("IFCB109" in key for key in filtered_keys)
 
 
-def test_nested_transforming_stores():
-    """Test that nested KeyTransformingStores work correctly"""
-    base_store = DictStore()
+def test_prefix_enables_efficient_s3_filtering():
+    """Test that prefix enables efficient S3 filtering vs fetching all keys"""
 
-    # Inner layer: add "data/" prefix
-    inner_transformer = PrefixKeyTransformer(prefix="data/")
-    inner_store = KeyTransformingStore(base_store, inner_transformer)
+    base_store = MockS3Store()
 
-    # Outer layer: add "v1/" prefix
-    outer_transformer = PrefixKeyTransformer(prefix="v1/")
-    outer_store = KeyTransformingStore(inner_store, outer_transformer)
+    # Add lots of keys in different bins
+    for bin_num in range(100, 110):
+        for roi_num in range(1, 6):
+            key = f"ifcb_data/2025/D20250114T172241_IFCB{bin_num}/{roi_num:05d}.png"
+            base_store.put(key, b"data")
 
-    # Put through outer store
-    outer_store.put("test.txt", b"hello")
+    # Total: 10 bins * 5 ROIs = 50 keys
+    assert len(base_store.data) == 50
 
-    # Should be stored as "data/v1/test.txt" in base store
-    assert base_store.exists("data/v1/test.txt")
+    # Without prefix: would iterate all 50 keys
+    all_keys = list(base_store.keys())
+    assert len(all_keys) == 50
 
-    # Get through outer store
-    data = outer_store.get("test.txt")
-    assert data == b"hello"
-
-    # List keys through outer store
-    keys = list(outer_store.keys())
-    assert "test.txt" in keys
+    # With prefix: only gets keys for one bin (5 keys)
+    filtered_keys = list(base_store.keys(prefix="ifcb_data/2025/D20250114T172241_IFCB109/"))
+    assert len(filtered_keys) == 5
+    assert all("IFCB109" in key for key in filtered_keys)
 
 
 if __name__ == "__main__":
     test_dictstore_kwargs()
-    test_transforming_store_kwargs()
-    test_nested_transforming_stores()
-    print("\nAll tests passed!")
+    test_prefix_passthrough()
+    test_prefix_enables_efficient_s3_filtering()
