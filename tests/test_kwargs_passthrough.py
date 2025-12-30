@@ -19,8 +19,6 @@ def test_dictstore_kwargs():
     keys_with_kwargs = list(store.keys(prefix="test"))
     assert len(keys_with_kwargs) == 2
 
-    print("✓ DictStore kwargs test passed")
-
 
 def test_transforming_store_kwargs():
     """Test that KeyTransformingStore passes kwargs through"""
@@ -45,8 +43,6 @@ def test_transforming_store_kwargs():
     assert "key2" in keys
     assert "newkey" in keys
     # "other/key3" won't be in the list because reverse transform will fail
-
-    print("✓ KeyTransformingStore kwargs test passed")
 
 
 def test_nested_transforming_stores():
@@ -74,8 +70,6 @@ def test_nested_transforming_stores():
     # List keys through outer store
     keys = list(outer_store.keys())
     assert "test.txt" in keys
-
-    print("✓ Nested KeyTransformingStore test passed")
 
 
 if __name__ == "__main__":
