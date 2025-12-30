@@ -149,7 +149,7 @@ class MediaStore(ObjectStore):
             raise KeyError(key)
         response.raise_for_status()
 
-    def keys(self):
+    def keys(self, **kwargs):
         """List all object keys (pids)"""
         response = self._session.get(f"{self.base_url}/api/media/dump")
         response.raise_for_status()

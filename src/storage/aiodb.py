@@ -44,7 +44,7 @@ class AsyncSqliteStore(ObjectStore):
         if cursor.rowcount == 0:
             raise KeyError(key)
 
-    async def keys(self):
+    async def keys(self, **kwargs):
         cursor = await self.conn.execute('SELECT key FROM objects')
         async for row in cursor:
             yield row[0]

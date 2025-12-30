@@ -34,5 +34,5 @@ class ZipStore(ObjectStore):
     def delete(self, key):
         raise NotImplementedError('deleting from zip files is not supported')
     
-    def keys(self):
+    def keys(self, **kwargs):
         return self.zipfile.namelist()

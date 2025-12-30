@@ -24,15 +24,15 @@ class IdentityStore(ObjectStore):
 
     def get(self, key):
         return self.store.get(key)
-    
+
     def exists(self, key):
         return self.store.exists(key)
-    
+
     def delete(self, key):
         return self.store.delete(key)
-    
-    def keys(self):
-        return self.store.keys()
+
+    def keys(self, **kwargs):
+        return self.store.keys(**kwargs)
     
 
 class ReadonlyStore(IdentityStore):
@@ -55,7 +55,7 @@ class WriteonlyStore(IdentityStore):
     def exists(self, key):
         raise NotImplementedError('store is write-only')
 
-    def keys(self):
+    def keys(self, **kwargs):
         raise NotImplementedError('store is write-only')
     
 
@@ -88,10 +88,10 @@ class MirroringStore(ObjectStore):
             if child.exists(key):
                 child.delete(key)
 
-    def keys(self):
+    def keys(self, **kwargs):
         keys = set()
         for child in self.children:
-            keys.update(child.keys())
+            keys.update(child.keys(**kwargs))
         return keys
 
 
@@ -124,8 +124,8 @@ class CachingStore(ObjectStore):
         if self.cache_store.exists(key):
             self.cache_store.delete(key)
 
-    def keys(self):
-        return self.main_store.keys()
+    def keys(self, **kwargs):
+        return self.main_store.keys(**kwargs)
 
     def clear(self, key=None):
         if key is None:
@@ -210,10 +210,10 @@ class LoggingStore(ObjectStore):
     def delete(self, key):
         self.logger.info(f'{self.store_name} delete {key}')
         return self.store.delete(key)
-    
-    def keys(self):
+
+    def keys(self, **kwargs):
         self.logger.info(f'{self.store_name} keys')
-        return self.store.keys()
+        return self.store.keys(**kwargs)
 
 
 class ExceptionLoggingStore(LoggingStore):
@@ -244,10 +244,10 @@ class ExceptionLoggingStore(LoggingStore):
         except Exception as e:
             self.logger.error(f'failed to delete {key}: {e}')
             return False
-    
-    def keys(self):
+
+    def keys(self, **kwargs):
         try:
-            return super().keys()
+            return super().keys(**kwargs)
         except Exception as e:
             self.logger.error(f'failed to get keys: {e}')
             return []
@@ -332,8 +332,8 @@ class TransformingStore(ObjectStore):
     def delete(self, key):
         return self.store.delete(key)
 
-    def keys(self):
-        return self.store.keys()
+    def keys(self, **kwargs):
+        return self.store.keys(**kwargs)
 
 
 class TextEncodingStore(TransformingStore):
@@ -468,9 +468,9 @@ class KeyTransformingStore(ObjectStore):
     def delete(self, key):
         return self.store.delete(self.transform_key(key))
 
-    def keys(self):
+    def keys(self, **kwargs):
         # skip any keys whose reverse transformation fails
-        for key in self.store.keys():
+        for key in self.store.keys(**kwargs):
             try:
                 yield self.reverse_transform_key(key)
             except ValueError:

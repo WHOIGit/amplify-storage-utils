@@ -41,9 +41,12 @@ class ObjectStore(ABC):
         """ delete the data associated with the key. """
         pass
 
-    def keys(self):
+    def keys(self, **kwargs):
         """" return an iterable of keys for all objects in the store.
-        classes that do not support listing keys should raise a NotImplementedError """
+        classes that do not support listing keys should raise a NotImplementedError
+
+        Additional keyword arguments are implementation-specific. For example,
+        BucketStore supports prefix='' for efficient S3 prefix filtering."""
         raise NotImplementedError
 
     
@@ -74,7 +77,8 @@ class DictStore(ObjectStore):
         else:
             raise KeyError(key)
 
-    def keys(self):
+    def keys(self, **kwargs):
+        # DictStore ignores kwargs like prefix - returns all keys
         return self.objects.keys()
 
 

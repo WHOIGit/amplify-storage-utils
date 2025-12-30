@@ -64,10 +64,10 @@ class AsyncFanoutStore(ObjectStore):
             if await child.exists(key):
                 await child.delete(key)
 
-    async def keys(self):
+    async def keys(self, **kwargs):
         keys = set()
         for child in self.children:
-            async for key in child.keys():
+            async for key in child.keys(**kwargs):
                 keys.add(key)
         for key in keys:
             yield key
@@ -117,8 +117,8 @@ class AsyncCachingStore(ObjectStore):
         if await self.cache_store.exists(key):
             await self.cache_store.delete(key)
 
-    async def keys(self):
-        async for key in self.main_store.keys():
+    async def keys(self, **kwargs):
+        async for key in self.main_store.keys(**kwargs):
             yield key
 
     async def clear(self, key=None):
@@ -170,8 +170,8 @@ class AsyncTransformingStore(ObjectStore):
     async def delete(self, key):
         return await self.store.delete(key)
 
-    async def keys(self):
-        async for key in self.store.keys():
+    async def keys(self, **kwargs):
+        async for key in self.store.keys(**kwargs):
             yield key
 
 
@@ -256,9 +256,9 @@ class AsyncKeyTransformingStore(ObjectStore):
     async def delete(self, key):
         return await self.store.delete(self.transform_key(key))
 
-    async def keys(self):
+    async def keys(self, **kwargs):
         # skip any keys where reverse transformation fails
-        async for key in self.store.keys():
+        async for key in self.store.keys(**kwargs):
             try:
                 yield self.reverse_transform_key(key)
             except ValueError:

@@ -36,7 +36,8 @@ class FilesystemStore(ObjectStore):
         except FileNotFoundError:
             raise KeyError(key)
 
-    def keys(self):
+    def keys(self, **kwargs):
+        # FilesystemStore ignores kwargs - returns all keys
         for dirpath, dirnames, filenames in os.walk(self.root_path):
             for filename in filenames:
                 yield os.path.relpath(os.path.join(dirpath, filename), self.root_path)
@@ -81,7 +82,7 @@ class HashdirStore(KeyTransformingStore):
         so listing keys is not supported."""
         raise NotImplementedError
 
-    def keys(self):
+    def keys(self, **kwargs):
         """HashdirStore does not support listing keys since the transformation
         cannot be reversed."""
         raise NotImplementedError
