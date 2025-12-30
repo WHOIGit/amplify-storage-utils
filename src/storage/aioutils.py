@@ -67,7 +67,7 @@ class AsyncFanoutStore(ObjectStore):
     async def keys(self, **kwargs):
         keys = set()
         for child in self.children:
-            async for key in child.keys():
+            async for key in child.keys(**kwargs):
                 keys.add(key)
         for key in keys:
             yield key
@@ -118,7 +118,7 @@ class AsyncCachingStore(ObjectStore):
             await self.cache_store.delete(key)
 
     async def keys(self, **kwargs):
-        async for key in self.main_store.keys():
+        async for key in self.main_store.keys(**kwargs):
             yield key
 
     async def clear(self, key=None):
