@@ -45,7 +45,7 @@ class HttpStore:
     def delete(self, key):
         raise NotImplementedError("HttpStore does not support delete operation.")
     
-    def keys(self):
+    def keys(self, **kwargs):
         raise NotImplementedError("HttpStore does not support listing keys.")
     
 
@@ -97,5 +97,5 @@ class AsyncHttpStore:
     async def delete(self, key):
         raise NotImplementedError("AsyncHttpStore does not support delete operation.")
     
-    async def keys(self):
+    async def keys(self, **kwargs):
         raise NotImplementedError("AsyncHttpStore does not support listing keys.")
