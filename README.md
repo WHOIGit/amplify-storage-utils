@@ -97,15 +97,47 @@ with SqliteStore('/path/to/db.sqlite') as store:
     data = store.get('my_object_key')
 ```
 
-The `AsyncBucketStore` class provides an asynchronous interface for S3-compatible object storage. It can be used with the asyncio library (note: this requires installing the optional "s3" imports):
+For S3 stores, create/manage the S3 client outside the store and inject it.
 
 ```python
+import boto3
+from storage.s3 import BucketStore
+
+client = boto3.client(
+    "s3",
+    endpoint_url="http://endpoint",
+    aws_access_key_id="X",
+    aws_secret_access_key="Y",
+)
+
+store = BucketStore("bucket-name", client)
+store.put("my_object_key", b"my object data")
+data = store.get("my_object_key")
+```
+
+The `AsyncBucketStore` class provides an asynchronous interface for S3-compatible object storage. It can be used with the asyncio library (note: this requires installing the optional "s3" imports).
+
+**Note:** the async S3 store does not manage the S3 client lifecycle; create/manage the client outside the store and inject it.
+
+```python
+import asyncio
+from aiobotocore.session import get_session
 from storage.s3 import AsyncBucketStore
 
 async def main():
-    async with AsyncBucketStore(bucket_name="bucket-name", endpoint_url="http://endpoint", s3_access_key="X", s3_secret_key="Y") as store:
-        await store.put('my_object_key', b'my object data')
-        data = await store.get('my_object_key')
+    session = get_session()
+    async with session.create_client(
+        "s3",
+        endpoint_url="http://endpoint",
+        aws_access_key_id="X",
+        aws_secret_access_key="Y",
+    ) as client:
+        store = AsyncBucketStore(bucket_name="bucket-name", client=client)
+
+        await store.put("my_object_key", b"my object data")
+        data = await store.get("my_object_key")
+
+        url = store.presigned_get("my_object_key")
 
 asyncio.run(main())
 ```
@@ -136,13 +168,15 @@ Config files must have a "main" parameter specifying the name of the store that 
 
 If the store has initialization parameters, they may be specified by the "config" parameter.
 
-```
+**Note:** `AsyncBucketStore` requires an injected async S3 client, so it typically cannot be fully constructed from YAML alone without a custom store/factory that creates the client.
+
+```yaml
+  # Example: AsyncBucketStore needs a client injected; use Python or a custom registered store
+  # to create the aiobotocore client and pass it in.
   async_store:
     type: AsyncBucketStore
     config:
-      endpoint_url: http://test
-      s3_access_key: X
-      s3_secret_key: Y
+      # bucket_name is used by the store
       bucket_name: test-bucket
 ```
 
@@ -220,4 +254,4 @@ stores:
     base: base_store
 
 main: custom_store
-``` 
+```

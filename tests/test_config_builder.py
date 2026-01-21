@@ -15,7 +15,7 @@ from mocks import MockS3
 @pytest.fixture
 def async_s3_store():
     store = load_yaml(cfg("async.yaml"))
-    store.s3_client = MockS3()
+    store.set_client(MockS3())
     return store
 
 
