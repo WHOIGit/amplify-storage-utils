@@ -25,9 +25,13 @@ s3 = [
   "boto3",
   "aiobotocore"
 ]
+redis = [
+  "redis>=4.2.0"
+]
 test = [
   "pytest>=8.0",
-  "pytest-asyncio"
+  "pytest-asyncio",
+  "redis>=4.2.0"
 ]
 
 [tool.hatch.build.targets.wheel]
