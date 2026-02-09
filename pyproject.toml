@@ -17,8 +17,8 @@ keywords = ['storage']
 dependencies = [
     'aiofiles',
     'aiosqlite',
+    'httpx',
     'pyyaml',
-    'requests'
 ]
 [project.optional-dependencies]
 s3 = [

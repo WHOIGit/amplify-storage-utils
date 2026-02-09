@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 from .object import StoreError
 
@@ -10,7 +10,7 @@ class HttpStore:
 
     def get(self, key):
         try:
-            response = requests.get(key)
+            response = httpx.get(key)
         except Exception as e:
             raise StoreError(f"HTTP request failed for key {key}") from e
         if response.status_code == 200:
@@ -28,7 +28,7 @@ class HttpStore:
     def exists(self, key):
         """attempts HEAD, if that 404s, tries GET as fallback"""
         try:
-            response = requests.head(key)
+            response = httpx.head(key)
         except Exception as e:
             raise StoreError(f"HTTP request failed for key {key}") from e
         status = response.status_code
@@ -36,7 +36,7 @@ class HttpStore:
             return True
         elif status == 405:  # Method Not Allowed
             try:
-                response = requests.get(key)
+                response = httpx.get(key)
             except Exception as e:
                 raise StoreError(f"HTTP request failed for key {key}") from e
             return response.status_code == 200
@@ -55,18 +55,17 @@ class AsyncHttpStore:
         pass
 
     async def get(self, key):
-        import aiohttp
-        async with aiohttp.ClientSession() as session:
+        async with httpx.AsyncClient() as client:
             try:
-                async with session.get(key) as response:
-                    if response.status == 200:
-                        return await response.read()
-                    if response.status == 404:
-                        raise KeyError(key)
-                    try:
-                        response.raise_for_status()
-                    except Exception as e:
-                        raise StoreError(f"HTTP error occurred: {response.status}") from e
+                response = await client.get(key)
+                if response.status_code == 200:
+                    return await response.aread()
+                if response.status_code == 404:
+                    raise KeyError(key)
+                try:
+                    response.raise_for_status()
+                except Exception as e:
+                    raise StoreError(f"HTTP error occurred: {response.status_code}") from e
             except KeyError:
                 raise
             except Exception as e:
@@ -77,22 +76,21 @@ class AsyncHttpStore:
     
     async def exists(self, key):
         """attempts HEAD, if that 404s, tries GET as fallback"""
-        import aiohttp
-        async with aiohttp.ClientSession() as session:
-            async with session.head(key) as response:
-                try:
-                    status = response.status
-                    if status == 200:
-                        return True
-                    elif status == 405:  # Method Not Allowed
-                        try:
-                            async with session.get(key) as get_response:
-                                return get_response.status == 200
-                        except Exception as e:
-                            raise StoreError(f"HTTP request failed for key {key}") from e
-                    return False
-                except Exception as e:
-                    raise StoreError(f"HTTP request failed for key {key}") from e
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.head(key)
+                status = response.status_code
+                if status == 200:
+                    return True
+                elif status == 405:  # Method Not Allowed
+                    try:
+                        get_response = await client.get(key)
+                        return get_response.status_code == 200
+                    except Exception as e:
+                        raise StoreError(f"HTTP request failed for key {key}") from e
+                return False
+            except Exception as e:
+                raise StoreError(f"HTTP request failed for key {key}") from e
             
     async def delete(self, key):
         raise NotImplementedError("AsyncHttpStore does not support delete operation.")
