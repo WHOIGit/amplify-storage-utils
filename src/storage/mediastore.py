@@ -78,7 +78,7 @@ class MediaStore(ObjectStore):
         if data.get("base64"):
             return bytearray(base64.b64decode(data["base64"]))
         elif data.get("presigned_get"):
-            download_response = self._session.get(data["presigned_get"])
+            download_response = httpx.get(data["presigned_get"])
             download_response.raise_for_status()
             return bytearray(download_response.content)
         else:
@@ -112,7 +112,7 @@ class MediaStore(ObjectStore):
         
         # If we got a presigned URL, use that
         if result.get("presigned_put"):
-            upload_response = self._session.put(
+            upload_response = httpx.put(
                 result["presigned_put"],
                 data=data
             )
