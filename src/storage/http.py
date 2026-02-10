@@ -5,12 +5,12 @@ from .object import StoreError
 
 class HttpStore:
 
-    def __init__(self):
-        pass
+    def __init__(self, follow_redirects=True):
+        self._follow_redirects = follow_redirects
 
     def get(self, key):
         try:
-            response = httpx.get(key)
+            response = httpx.get(key, follow_redirects=self._follow_redirects)
         except Exception as e:
             raise StoreError(f"HTTP request failed for key {key}") from e
         if response.status_code == 200:
@@ -28,7 +28,7 @@ class HttpStore:
     def exists(self, key):
         """attempts HEAD, if that 404s, tries GET as fallback"""
         try:
-            response = httpx.head(key)
+            response = httpx.head(key, follow_redirects=self._follow_redirects)
         except Exception as e:
             raise StoreError(f"HTTP request failed for key {key}") from e
         status = response.status_code
@@ -36,7 +36,7 @@ class HttpStore:
             return True
         elif status == 405:  # Method Not Allowed
             try:
-                response = httpx.get(key)
+                response = httpx.get(key, follow_redirects=self._follow_redirects)
             except Exception as e:
                 raise StoreError(f"HTTP request failed for key {key}") from e
             return response.status_code == 200
@@ -51,11 +51,11 @@ class HttpStore:
 
 class AsyncHttpStore:
     
-    def __init__(self):
-        pass
+    def __init__(self, follow_redirects=True):
+        self._follow_redirects = follow_redirects
 
     async def get(self, key):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=self._follow_redirects) as client:
             try:
                 response = await client.get(key)
                 if response.status_code == 200:
@@ -76,7 +76,7 @@ class AsyncHttpStore:
     
     async def exists(self, key):
         """attempts HEAD, if that 404s, tries GET as fallback"""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=self._follow_redirects) as client:
             try:
                 response = await client.head(key)
                 status = response.status_code
