@@ -1,4 +1,4 @@
-import requests
+import httpx
 import base64
 from typing import Optional
 from storage.object import ObjectStore
@@ -33,7 +33,7 @@ class MediaStore(ObjectStore):
         self._token = token
         self.store_config = store_config
         self.pid_type = pid_type
-        self._session = requests.Session()
+        self._session = httpx.Client(follow_redirects=True)
 
     def __enter__(self):
         """Authenticate when entering context"""
@@ -78,7 +78,7 @@ class MediaStore(ObjectStore):
         if data.get("base64"):
             return bytearray(base64.b64decode(data["base64"]))
         elif data.get("presigned_get"):
-            download_response = requests.get(data["presigned_get"])
+            download_response = httpx.get(data["presigned_get"], follow_redirects=True)
             download_response.raise_for_status()
             return bytearray(download_response.content)
         else:
@@ -112,9 +112,10 @@ class MediaStore(ObjectStore):
         
         # If we got a presigned URL, use that
         if result.get("presigned_put"):
-            upload_response = requests.put(
+            upload_response = httpx.put(
                 result["presigned_put"],
-                data=data
+                data=data,
+                follow_redirects=True
             )
             upload_response.raise_for_status()
         else:
@@ -134,13 +135,10 @@ class MediaStore(ObjectStore):
 
     def exists(self, key: str) -> bool:
         """Check if object exists by key (pid)"""
-        try:
-            response = self._session.get(f"{self.base_url}/api/media/{key}")
-            return response.status_code == 200
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return False
-            raise
+        response = self._session.get(f"{self.base_url}/api/media/{key}")
+        if response.status_code == 404:
+            return False
+        return response.status_code == 200
 
     def delete(self, key: str):
         """Delete object by key (pid)"""
