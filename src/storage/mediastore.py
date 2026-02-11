@@ -33,7 +33,7 @@ class MediaStore(ObjectStore):
         self._token = token
         self.store_config = store_config
         self.pid_type = pid_type
-        self._session = httpx.Client()
+        self._session = httpx.Client(follow_redirects=True)
 
     def __enter__(self):
         """Authenticate when entering context"""
@@ -78,7 +78,7 @@ class MediaStore(ObjectStore):
         if data.get("base64"):
             return bytearray(base64.b64decode(data["base64"]))
         elif data.get("presigned_get"):
-            download_response = httpx.get(data["presigned_get"])
+            download_response = httpx.get(data["presigned_get"], follow_redirects=True)
             download_response.raise_for_status()
             return bytearray(download_response.content)
         else:
@@ -114,7 +114,8 @@ class MediaStore(ObjectStore):
         if result.get("presigned_put"):
             upload_response = httpx.put(
                 result["presigned_put"],
-                data=data
+                data=data,
+                follow_redirects=True
             )
             upload_response.raise_for_status()
         else:
