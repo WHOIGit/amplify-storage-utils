@@ -13,21 +13,23 @@ The core of the project is the `ObjectStore` abstract base class defined in `obj
 Concrete implementations of the `ObjectStore` interface are provided for various storage backends:
 
 - In-memory dictionary (`DictStore`)
-- Filesystem (`FilesystemStore`)
-- Filesystem with hashed directory structure (`HashdirStore`)
+- Filesystem (`FilesystemStore`, `SafeFilesystemStore`, `HashdirStore`)
 - SQLite database (`SqliteStore`)
 - S3-compatible object storage (`BucketStore`) (note: only available if the optional "s3" dependencies are installed)
+- Redis (`RedisStore`) (note: only available if the optional "redis" dependencies are installed)
+- HTTP/HTTPS read-only access (`HttpStore`)
 - Zip files (`ZipStore`)
 
-`asyncio` based implementations are available for some of these backends.
+`asyncio` based implementations are available for most backends: `AsyncFilesystemStore`, `AsyncSafeFilesystemStore`, `AsyncHashdirStore`, `AsyncSqliteStore`, `AsyncBucketStore`, `AsyncRedisStore`, `AsyncHttpStore`.
 
 ### Utilities
 
 The `storage.utils` module provides utilities for working with more complex store setups, including:
 
-- Multi-store setups 
+- Multi-store setups
   - `MirroringStore` which replicates operations across a set of child stores
   - `CachingStore` in which a faster store can be used as a cache for a slower store
+  - `RoutingStore` which dispatches operations to child stores based on key prefixes
 - `ReadonlyStore` to create a store without put or delete functionality
 - `WriteonlyStore` to create a store without get, exists, or key listing functionality
 - `NotifyingStore` to set handlers that run on changes and/or put calls
@@ -38,6 +40,7 @@ The `storage.utils` module provides utilities for working with more complex stor
   - `GzipStore` that stores data with gzip compression
   - `BufferStore` that provides a buffer interface for a backing store
   - `Base64Store` that encodes and decodes data as base64
+  - `JsonStore` that serializes and deserializes JSON-compatible Python objects
 - Key transforming stores
   - `KeyValidatingStore` that validates keys using a given validator
   - `RegexValidatingStore`, that uses Regex to validate keys
@@ -50,7 +53,7 @@ The `storage.utils` module provides utilities for working with more complex stor
   - `copy_store` for copying a store into another
   - `clear_store` for removing all store data
 
-`asyncio` versions of some of the utilities are provided in the `aioutils` module.
+`asyncio` versions of all utilities are provided in the `aioutils` module. The async equivalent of `MirroringStore` is `AsyncFanoutStore`; all others follow the `Async` prefix convention (`AsyncCachingStore`, `AsyncRoutingStore`, `AsyncGzipStore`, `AsyncPrefixStore`, etc.).
 
 ## Usage
 
@@ -140,6 +143,45 @@ async def main():
         url = store.presigned_get("my_object_key")
 
 asyncio.run(main())
+```
+
+### RoutingStore
+
+`RoutingStore` (and its async counterpart `AsyncRoutingStore`) dispatches operations to child stores based on key prefixes. Routes are checked in order and the first matching prefix wins.
+
+```python
+from storage.fs import FilesystemStore
+from storage.s3 import BucketStore
+from storage.utils import RoutingStore
+
+images_store = FilesystemStore('/data/images')
+docs_store = BucketStore('my-docs-bucket', client)
+
+router = RoutingStore([
+    ('images/', images_store),
+    ('docs/', docs_store),
+])
+
+router.put('images/photo.jpg', image_bytes)   # stored in images_store
+router.put('docs/report.pdf', pdf_bytes)       # stored in docs_store
+data = router.get('images/photo.jpg')
+```
+
+Routes can optionally strip the prefix before passing the key to the child store, which is useful when the child store has its own namespace:
+
+```python
+router = RoutingStore([
+    ('images/', images_store, True),   # child sees 'photo.jpg', not 'images/photo.jpg'
+    ('docs/', docs_store, True),       # child sees 'report.pdf', not 'docs/report.pdf'
+])
+```
+
+Routes can also be added incrementally with `add_route`:
+
+```python
+router = RoutingStore()
+router.add_route('images/', images_store, strip_prefix=True)
+router.add_route('docs/', docs_store)
 ```
 
 ## YAML configuration
