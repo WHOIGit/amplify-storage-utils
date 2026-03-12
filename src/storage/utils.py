@@ -549,9 +549,69 @@ class UrlEncodingStore(KeyTransformingStore):
         super().__init__(store, UrlEncodingKeyTransformer())
 
 
+class RoutingStore(ObjectStore):
+    """
+    A store that routes operations to child stores based on key prefixes.
+    Routes are checked in order and the first matching prefix wins.
+
+    Each route is a (prefix, store) or (prefix, store, strip_prefix) tuple.
+    When strip_prefix is True the prefix is removed from the key before it is
+    passed to the child store, and re-added to keys returned by keys().
+    """
+
+    def __init__(self, routes=None):
+        # normalise to (prefix, store, strip_prefix) triples
+        self.routes = [self._normalise(r) for r in (routes or [])]
+
+    @staticmethod
+    def _normalise(route):
+        if len(route) == 2:
+            prefix, store = route
+            return (prefix, store, False)
+        return tuple(route)
+
+    def add_route(self, prefix, store, strip_prefix=False):
+        self.routes.append((prefix, store, strip_prefix))
+
+    def _route(self, key):
+        for prefix, store, strip in self.routes:
+            if key.startswith(prefix):
+                routed_key = key[len(prefix):] if strip else key
+                return store, routed_key
+        raise KeyError(key)
+
+    def put(self, key, data):
+        store, routed_key = self._route(key)
+        store.put(routed_key, data)
+
+    def get(self, key):
+        store, routed_key = self._route(key)
+        return store.get(routed_key)
+
+    def exists(self, key):
+        try:
+            store, routed_key = self._route(key)
+        except KeyError:
+            return False
+        return store.exists(routed_key)
+
+    def delete(self, key):
+        store, routed_key = self._route(key)
+        store.delete(routed_key)
+
+    def keys(self, **kwargs):
+        seen = set()
+        for prefix, store, strip in self.routes:
+            for key in store.keys(**kwargs):
+                full_key = prefix + key if strip else key
+                if full_key not in seen:
+                    seen.add(full_key)
+                    yield full_key
+
+
 # utility functions for multi-store actions
 
-            
+
 def copy_store(from_store, to_store, overwrite=True):
     for key in from_store.keys():
         if overwrite or not to_store.exists(key):

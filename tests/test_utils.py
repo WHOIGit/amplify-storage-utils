@@ -13,6 +13,7 @@ from storage.utils import (
     BufferStore, Base64Store, JsonStore, PrefixStore, UrlEncodingStore,
     LoggingStore, ExceptionLoggingStore, KeyValidatingStore,
     UrlValidatingStore, HashPrefixStore, RegexValidatingStore,
+    RoutingStore,
     copy_store, clear_store, sync_stores
 )
 
@@ -441,6 +442,109 @@ class TestNotifyingStore:
 
         with pytest.raises(Exception):
             notifying_store.delete(test_key)
+
+
+class TestRoutingStore:
+    def test_basic_routing(self, test_data):
+        store_a = DictStore()
+        store_b = DictStore()
+        router = RoutingStore([('a/', store_a), ('b/', store_b)])
+
+        router.put('a/foo', test_data)
+        router.put('b/bar', test_data)
+
+        assert router.get('a/foo') == test_data
+        assert router.get('b/bar') == test_data
+        assert store_a.exists('a/foo')
+        assert store_b.exists('b/bar')
+        assert not store_a.exists('b/bar')
+        assert not store_b.exists('a/foo')
+
+    def test_add_route(self, test_data):
+        store_a = DictStore()
+        router = RoutingStore()
+        router.add_route('a/', store_a)
+
+        router.put('a/foo', test_data)
+        assert router.get('a/foo') == test_data
+
+    def test_exists(self, test_data):
+        store_a = DictStore()
+        router = RoutingStore([('a/', store_a)])
+
+        assert not router.exists('a/missing')
+        assert not router.exists('unrouted')
+        router.put('a/foo', test_data)
+        assert router.exists('a/foo')
+
+    def test_delete(self, test_data):
+        store_a = DictStore()
+        router = RoutingStore([('a/', store_a)])
+
+        router.put('a/foo', test_data)
+        router.delete('a/foo')
+        assert not router.exists('a/foo')
+
+    def test_keys(self, test_data):
+        store_a = DictStore()
+        store_b = DictStore()
+        router = RoutingStore([('a/', store_a), ('b/', store_b)])
+
+        router.put('a/foo', test_data)
+        router.put('b/bar', test_data)
+
+        assert set(router.keys()) == {'a/foo', 'b/bar'}
+
+    def test_first_prefix_wins(self, test_data):
+        store_a = DictStore()
+        store_b = DictStore()
+        # both prefixes match 'a/foo', first should win
+        router = RoutingStore([('a/', store_a), ('a/foo', store_b)])
+
+        router.put('a/foo', test_data)
+        assert store_a.exists('a/foo')
+        assert not store_b.exists('a/foo')
+
+    def test_no_matching_prefix_raises(self, test_data):
+        router = RoutingStore([('a/', DictStore())])
+        with pytest.raises(KeyError):
+            router.get('b/foo')
+        with pytest.raises(KeyError):
+            router.put('b/foo', test_data)
+
+    def test_strip_prefix(self, test_data):
+        child = DictStore()
+        router = RoutingStore([('a/', child, True)])
+
+        router.put('a/foo', test_data)
+        assert child.exists('foo')          # prefix stripped when stored
+        assert not child.exists('a/foo')
+        assert router.get('a/foo') == test_data
+        assert router.exists('a/foo')
+        assert not router.exists('foo')     # unrouted key returns False
+
+        router.delete('a/foo')
+        assert not child.exists('foo')
+
+    def test_strip_prefix_keys(self, test_data):
+        child = DictStore()
+        router = RoutingStore([('a/', child, True)])
+
+        router.put('a/foo', test_data)
+        router.put('a/bar', test_data)
+        assert set(router.keys()) == {'a/foo', 'a/bar'}
+
+    def test_strip_prefix_mixed_routes(self, test_data):
+        child_strip = DictStore()
+        child_keep = DictStore()
+        router = RoutingStore([('a/', child_strip, True), ('b/', child_keep)])
+
+        router.put('a/foo', test_data)
+        router.put('b/bar', test_data)
+
+        assert child_strip.exists('foo')
+        assert child_keep.exists('b/bar')
+        assert set(router.keys()) == {'a/foo', 'b/bar'}
 
 
 def test_copy_store(store, test_data):
