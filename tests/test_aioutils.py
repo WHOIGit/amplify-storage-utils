@@ -2,8 +2,9 @@ import pytest
 from io import BytesIO
 import base64
 
-from storage.utils import DataTransformer, KeyTransformer
+from storage.utils import DataTransformer, KeyTransformer, PrefixKeyTransformer
 from storage.aioutils import (
+    AsyncRegexRoutingStore,
     AsyncFanoutStore,
     AsyncCachingStore,
     AsyncTransformingStore,
@@ -558,5 +559,97 @@ class TestAsyncContextManagers:
         # Verify that main_store was entered AND then exited (cleaned up)
         assert main_store.entered
         assert main_store.exited  # This is the key - cleanup happened!
+
+
+class TestAsyncRegexRoutingStore:
+    async def test_basic_routing(self, test_data):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+            (r'^docs/', PrefixKeyTransformer('doc/')),
+        ])
+
+        await router.put('images/photo.jpg', test_data)
+        await router.put('docs/readme.txt', test_data)
+
+        assert await store.exists('img/images/photo.jpg')
+        assert await store.exists('doc/docs/readme.txt')
+        assert await router.get('images/photo.jpg') == test_data
+        assert await router.get('docs/readme.txt') == test_data
+
+    async def test_add_route(self, test_data):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store)
+        router.add_route(r'^images/', PrefixKeyTransformer('img/'))
+
+        await router.put('images/photo.jpg', test_data)
+        assert await router.get('images/photo.jpg') == test_data
+
+    async def test_first_regex_wins(self, test_data):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('first/')),
+            (r'^images/special', PrefixKeyTransformer('second/')),
+        ])
+
+        await router.put('images/special.jpg', test_data)
+        assert await store.exists('first/images/special.jpg')
+        assert not await store.exists('second/images/special.jpg')
+
+    async def test_no_match_raises(self, test_data):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        with pytest.raises(KeyError):
+            await router.get('videos/clip.mp4')
+        with pytest.raises(KeyError):
+            await router.put('videos/clip.mp4', test_data)
+
+    async def test_exists_no_match_returns_false(self):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        assert not await router.exists('videos/clip.mp4')
+
+    async def test_delete(self, test_data):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        await router.put('images/photo.jpg', test_data)
+        await router.delete('images/photo.jpg')
+        assert not await router.exists('images/photo.jpg')
+
+    async def test_keys_raises(self):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        with pytest.raises(NotImplementedError):
+            await router.keys()
+
+    async def test_regex_pattern_matching(self, test_data):
+        store = AsyncDictStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'\.jpg$', PrefixKeyTransformer('jpeg/')),
+            (r'\.png$', PrefixKeyTransformer('png/')),
+        ])
+        await router.put('photo.jpg', test_data)
+        await router.put('icon.png', test_data)
+
+        assert await store.exists('jpeg/photo.jpg')
+        assert await store.exists('png/icon.png')
+
+    async def test_context_manager(self, test_data):
+        store = AsyncContextTrackingStore()
+        router = AsyncRegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        async with router:
+            assert store.entered
+            await router.put('images/photo.jpg', test_data)
+        assert store.exited
 
 
