@@ -29,7 +29,7 @@ The `storage.utils` module provides utilities for working with more complex stor
 - Multi-store setups
   - `MirroringStore` which replicates operations across a set of child stores
   - `CachingStore` in which a faster store can be used as a cache for a slower store
-  - `RoutingStore` which dispatches operations to child stores based on key prefixes
+  - `RegexRoutingStore` which selects a key transformer based on regex matching
 - `ReadonlyStore` to create a store without put or delete functionality
 - `WriteonlyStore` to create a store without get, exists, or key listing functionality
 - `NotifyingStore` to set handlers that run on changes and/or put calls
@@ -53,7 +53,7 @@ The `storage.utils` module provides utilities for working with more complex stor
   - `copy_store` for copying a store into another
   - `clear_store` for removing all store data
 
-`asyncio` versions of all utilities are provided in the `aioutils` module. The async equivalent of `MirroringStore` is `AsyncFanoutStore`; all others follow the `Async` prefix convention (`AsyncCachingStore`, `AsyncRoutingStore`, `AsyncGzipStore`, `AsyncPrefixStore`, etc.).
+`asyncio` versions of all utilities are provided in the `aioutils` module. The async equivalent of `MirroringStore` is `AsyncFanoutStore`; all others follow the `Async` prefix convention (`AsyncCachingStore`, `AsyncRegexRoutingStore`, `AsyncGzipStore`, `AsyncPrefixStore`, etc.).
 
 ## Usage
 
@@ -145,43 +145,31 @@ async def main():
 asyncio.run(main())
 ```
 
-### RoutingStore
+### RegexRoutingStore
 
-`RoutingStore` (and its async counterpart `AsyncRoutingStore`) dispatches operations to child stores based on key prefixes. Routes are checked in order and the first matching prefix wins.
-
-```python
-from storage.fs import FilesystemStore
-from storage.s3 import BucketStore
-from storage.utils import RoutingStore
-
-images_store = FilesystemStore('/data/images')
-docs_store = BucketStore('my-docs-bucket', client)
-
-router = RoutingStore([
-    ('images/', images_store),
-    ('docs/', docs_store),
-])
-
-router.put('images/photo.jpg', image_bytes)   # stored in images_store
-router.put('docs/report.pdf', pdf_bytes)       # stored in docs_store
-data = router.get('images/photo.jpg')
-```
-
-Routes can optionally strip the prefix before passing the key to the child store, which is useful when the child store has its own namespace:
+`RegexRoutingStore` (and its async counterpart `AsyncRegexRoutingStore`) wraps a backing store and selects a `KeyTransformer` based on regex matching of the incoming key. Routes are checked in order and the first matching regex wins.
 
 ```python
-router = RoutingStore([
-    ('images/', images_store, True),   # child sees 'photo.jpg', not 'images/photo.jpg'
-    ('docs/', docs_store, True),       # child sees 'report.pdf', not 'docs/report.pdf'
+from storage.object import DictStore
+from storage.utils import RegexRoutingStore, PrefixKeyTransformer
+
+store = DictStore()
+router = RegexRoutingStore(store, [
+    (r'\.jpg$', PrefixKeyTransformer('jpeg/')),
+    (r'\.png$', PrefixKeyTransformer('png/')),
 ])
+
+router.put('photo.jpg', image_bytes)   # stored as 'jpeg/photo.jpg'
+router.put('icon.png', icon_bytes)     # stored as 'png/icon.png'
+data = router.get('photo.jpg')
 ```
 
 Routes can also be added incrementally with `add_route`:
 
 ```python
-router = RoutingStore()
-router.add_route('images/', images_store, strip_prefix=True)
-router.add_route('docs/', docs_store)
+router = RegexRoutingStore(store)
+router.add_route(r'^images/', PrefixKeyTransformer('img/'))
+router.add_route(r'^docs/', PrefixKeyTransformer('doc/'))
 ```
 
 ## YAML configuration

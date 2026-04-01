@@ -571,16 +571,6 @@ class RegexRoutingStore(ObjectStore):
                 return transformer
         raise KeyError(f'no route matches key: {key}')
 
-    def _reverse_match(self, stored_key):
-        for pattern, transformer in self.routes:
-            try:
-                original = transformer.reverse_transform_key(stored_key)
-            except (ValueError, KeyError):
-                continue
-            if pattern.search(original):
-                return original
-        return None
-
     def put(self, key, data):
         transformer = self._match(key)
         self.store.put(transformer.transform_key(key), data)
@@ -601,72 +591,9 @@ class RegexRoutingStore(ObjectStore):
         self.store.delete(transformer.transform_key(key))
 
     def keys(self, **kwargs):
-        seen = set()
-        for key in self.store.keys(**kwargs):
-            original = self._reverse_match(key)
-            if original is not None and original not in seen:
-                seen.add(original)
-                yield original
-
-
-class RoutingStore(ObjectStore):
-    """
-    A store that routes operations to child stores based on key prefixes.
-    Routes are checked in order and the first matching prefix wins.
-
-    Each route is a (prefix, store) or (prefix, store, strip_prefix) tuple.
-    When strip_prefix is True the prefix is removed from the key before it is
-    passed to the child store, and re-added to keys returned by keys().
-    """
-
-    def __init__(self, routes=None):
-        # normalise to (prefix, store, strip_prefix) triples
-        self.routes = [self._normalise(r) for r in (routes or [])]
-
-    @staticmethod
-    def _normalise(route):
-        if len(route) == 2:
-            prefix, store = route
-            return (prefix, store, False)
-        return tuple(route)
-
-    def add_route(self, prefix, store, strip_prefix=False):
-        self.routes.append((prefix, store, strip_prefix))
-
-    def _route(self, key):
-        for prefix, store, strip in self.routes:
-            if key.startswith(prefix):
-                routed_key = key[len(prefix):] if strip else key
-                return store, routed_key
-        raise KeyError(key)
-
-    def put(self, key, data):
-        store, routed_key = self._route(key)
-        store.put(routed_key, data)
-
-    def get(self, key):
-        store, routed_key = self._route(key)
-        return store.get(routed_key)
-
-    def exists(self, key):
-        try:
-            store, routed_key = self._route(key)
-        except KeyError:
-            return False
-        return store.exists(routed_key)
-
-    def delete(self, key):
-        store, routed_key = self._route(key)
-        store.delete(routed_key)
-
-    def keys(self, **kwargs):
-        seen = set()
-        for prefix, store, strip in self.routes:
-            for key in store.keys(**kwargs):
-                full_key = prefix + key if strip else key
-                if full_key not in seen:
-                    seen.add(full_key)
-                    yield full_key
+        raise NotImplementedError(
+            'keys() is not supported: key transformers may not be reversible'
+        )
 
 
 # utility functions for multi-store actions
