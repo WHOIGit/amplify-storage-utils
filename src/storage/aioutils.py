@@ -320,6 +320,77 @@ class AsyncUrlEncodingStore(AsyncKeyTransformingStore):
         super().__init__(store, UrlEncodingKeyTransformer())
 
 
+class AsyncRegexRoutingStore(ObjectStore):
+    """
+    Async store that selects a KeyTransformer based on regex matching of the key.
+    Routes are checked in order and the first matching regex wins.
+
+    Each route is a (pattern, transformer) tuple where pattern is a regex string
+    and transformer is a KeyTransformer instance.
+    """
+
+    def __init__(self, store, routes=None):
+        import re
+        self.store = store
+        self.routes = [(re.compile(p), t) for p, t in (routes or [])]
+
+    def add_route(self, pattern, transformer):
+        import re
+        self.routes.append((re.compile(pattern), transformer))
+
+    async def __aenter__(self):
+        if hasattr(self.store, '__aenter__'):
+            self.store = await self.store.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if hasattr(self.store, '__aexit__'):
+            await self.store.__aexit__(exc_type, exc, tb)
+
+    def _match(self, key):
+        for pattern, transformer in self.routes:
+            if pattern.search(key):
+                return transformer
+        raise KeyError(f'no route matches key: {key}')
+
+    def _reverse_match(self, stored_key):
+        for pattern, transformer in self.routes:
+            try:
+                original = transformer.reverse_transform_key(stored_key)
+            except (ValueError, KeyError):
+                continue
+            if pattern.search(original):
+                return original
+        return None
+
+    async def put(self, key, data):
+        transformer = self._match(key)
+        await self.store.put(transformer.transform_key(key), data)
+
+    async def get(self, key):
+        transformer = self._match(key)
+        return await self.store.get(transformer.transform_key(key))
+
+    async def exists(self, key):
+        try:
+            transformer = self._match(key)
+        except KeyError:
+            return False
+        return await self.store.exists(transformer.transform_key(key))
+
+    async def delete(self, key):
+        transformer = self._match(key)
+        await self.store.delete(transformer.transform_key(key))
+
+    async def keys(self, **kwargs):
+        seen = set()
+        async for key in self.store.keys(**kwargs):
+            original = self._reverse_match(key)
+            if original is not None and original not in seen:
+                seen.add(original)
+                yield original
+
+
 class AsyncRoutingStore(ObjectStore):
     """
     Async store that routes operations to child stores based on key prefixes.

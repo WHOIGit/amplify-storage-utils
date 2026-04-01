@@ -549,6 +549,66 @@ class UrlEncodingStore(KeyTransformingStore):
         super().__init__(store, UrlEncodingKeyTransformer())
 
 
+class RegexRoutingStore(ObjectStore):
+    """
+    A store that selects a KeyTransformer based on regex matching of the key.
+    Routes are checked in order and the first matching regex wins.
+
+    Each route is a (pattern, transformer) tuple where pattern is a regex string
+    and transformer is a KeyTransformer instance.
+    """
+
+    def __init__(self, store, routes=None):
+        self.store = store
+        self.routes = [(re.compile(p), t) for p, t in (routes or [])]
+
+    def add_route(self, pattern, transformer):
+        self.routes.append((re.compile(pattern), transformer))
+
+    def _match(self, key):
+        for pattern, transformer in self.routes:
+            if pattern.search(key):
+                return transformer
+        raise KeyError(f'no route matches key: {key}')
+
+    def _reverse_match(self, stored_key):
+        for pattern, transformer in self.routes:
+            try:
+                original = transformer.reverse_transform_key(stored_key)
+            except (ValueError, KeyError):
+                continue
+            if pattern.search(original):
+                return original
+        return None
+
+    def put(self, key, data):
+        transformer = self._match(key)
+        self.store.put(transformer.transform_key(key), data)
+
+    def get(self, key):
+        transformer = self._match(key)
+        return self.store.get(transformer.transform_key(key))
+
+    def exists(self, key):
+        try:
+            transformer = self._match(key)
+        except KeyError:
+            return False
+        return self.store.exists(transformer.transform_key(key))
+
+    def delete(self, key):
+        transformer = self._match(key)
+        self.store.delete(transformer.transform_key(key))
+
+    def keys(self, **kwargs):
+        seen = set()
+        for key in self.store.keys(**kwargs):
+            original = self._reverse_match(key)
+            if original is not None and original not in seen:
+                seen.add(original)
+                yield original
+
+
 class RoutingStore(ObjectStore):
     """
     A store that routes operations to child stores based on key prefixes.
