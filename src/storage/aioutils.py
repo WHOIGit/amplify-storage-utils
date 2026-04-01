@@ -320,80 +320,63 @@ class AsyncUrlEncodingStore(AsyncKeyTransformingStore):
         super().__init__(store, UrlEncodingKeyTransformer())
 
 
-class AsyncRoutingStore(ObjectStore):
+class AsyncRegexRoutingStore(ObjectStore):
     """
-    Async store that routes operations to child stores based on key prefixes.
-    Routes are checked in order and the first matching prefix wins.
+    Async store that selects a KeyTransformer based on regex matching of the key.
+    Routes are checked in order and the first matching regex wins.
 
-    Each route is a (prefix, store) or (prefix, store, strip_prefix) tuple.
-    When strip_prefix is True the prefix is removed from the key before it is
-    passed to the child store, and re-added to keys returned by keys().
+    Each route is a (pattern, transformer) tuple where pattern is a regex string
+    and transformer is a KeyTransformer instance.
     """
 
-    def __init__(self, routes=None):
-        self.routes = [self._normalise(r) for r in (routes or [])]
-        self._exit_stack = None
+    def __init__(self, store, routes=None):
+        import re
+        self.store = store
+        self.routes = [(re.compile(p), t) for p, t in (routes or [])]
 
-    @staticmethod
-    def _normalise(route):
-        if len(route) == 2:
-            prefix, store = route
-            return (prefix, store, False)
-        return tuple(route)
-
-    def add_route(self, prefix, store, strip_prefix=False):
-        self.routes.append((prefix, store, strip_prefix))
+    def add_route(self, pattern, transformer):
+        import re
+        self.routes.append((re.compile(pattern), transformer))
 
     async def __aenter__(self):
-        self._exit_stack = AsyncExitStack()
-        await self._exit_stack.__aenter__()
-        try:
-            for i, (prefix, store, strip) in enumerate(self.routes):
-                if hasattr(store, '__aenter__'):
-                    self.routes[i] = (prefix, await self._exit_stack.enter_async_context(store), strip)
-            return self
-        except:
-            await self._exit_stack.__aexit__(*sys.exc_info())
-            raise
+        if hasattr(self.store, '__aenter__'):
+            self.store = await self.store.__aenter__()
+        return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        if self._exit_stack is not None:
-            await self._exit_stack.__aexit__(exc_type, exc, tb)
+        if hasattr(self.store, '__aexit__'):
+            await self.store.__aexit__(exc_type, exc, tb)
 
-    def _route(self, key):
-        for prefix, store, strip in self.routes:
-            if key.startswith(prefix):
-                routed_key = key[len(prefix):] if strip else key
-                return store, routed_key
-        raise KeyError(key)
+    def _match(self, key):
+        for pattern, transformer in self.routes:
+            if pattern.search(key):
+                return transformer
+        raise KeyError(f'no route matches key: {key}')
 
     async def put(self, key, data):
-        store, routed_key = self._route(key)
-        await store.put(routed_key, data)
+        transformer = self._match(key)
+        await self.store.put(transformer.transform_key(key), data)
 
     async def get(self, key):
-        store, routed_key = self._route(key)
-        return await store.get(routed_key)
+        transformer = self._match(key)
+        return await self.store.get(transformer.transform_key(key))
 
     async def exists(self, key):
         try:
-            store, routed_key = self._route(key)
+            transformer = self._match(key)
         except KeyError:
             return False
-        return await store.exists(routed_key)
+        return await self.store.exists(transformer.transform_key(key))
 
     async def delete(self, key):
-        store, routed_key = self._route(key)
-        await store.delete(routed_key)
+        transformer = self._match(key)
+        await self.store.delete(transformer.transform_key(key))
 
     async def keys(self, **kwargs):
-        seen = set()
-        for prefix, store, strip in self.routes:
-            async for key in store.keys(**kwargs):
-                full_key = prefix + key if strip else key
-                if full_key not in seen:
-                    seen.add(full_key)
-                    yield full_key
+        raise NotImplementedError(
+            'keys() is not supported: key transformers may not be reversible'
+        )
+
 
 
 # utility functions for multi-store actions

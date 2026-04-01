@@ -13,7 +13,8 @@ from storage.utils import (
     BufferStore, Base64Store, JsonStore, PrefixStore, UrlEncodingStore,
     LoggingStore, ExceptionLoggingStore, KeyValidatingStore,
     UrlValidatingStore, HashPrefixStore, RegexValidatingStore,
-    RoutingStore,
+    RegexRoutingStore,
+    PrefixKeyTransformer, HashPrefixKeyTransformer,
     copy_store, clear_store, sync_stores
 )
 
@@ -444,107 +445,93 @@ class TestNotifyingStore:
             notifying_store.delete(test_key)
 
 
-class TestRoutingStore:
+
+class TestRegexRoutingStore:
     def test_basic_routing(self, test_data):
-        store_a = DictStore()
-        store_b = DictStore()
-        router = RoutingStore([('a/', store_a), ('b/', store_b)])
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+            (r'^docs/', PrefixKeyTransformer('doc/')),
+        ])
 
-        router.put('a/foo', test_data)
-        router.put('b/bar', test_data)
+        router.put('images/photo.jpg', test_data)
+        router.put('docs/readme.txt', test_data)
 
-        assert router.get('a/foo') == test_data
-        assert router.get('b/bar') == test_data
-        assert store_a.exists('a/foo')
-        assert store_b.exists('b/bar')
-        assert not store_a.exists('b/bar')
-        assert not store_b.exists('a/foo')
+        # keys are transformed in the backing store
+        assert store.exists('img/images/photo.jpg')
+        assert store.exists('doc/docs/readme.txt')
+
+        # get via the router uses the same transform
+        assert router.get('images/photo.jpg') == test_data
+        assert router.get('docs/readme.txt') == test_data
 
     def test_add_route(self, test_data):
-        store_a = DictStore()
-        router = RoutingStore()
-        router.add_route('a/', store_a)
+        store = DictStore()
+        router = RegexRoutingStore(store)
+        router.add_route(r'^images/', PrefixKeyTransformer('img/'))
 
-        router.put('a/foo', test_data)
-        assert router.get('a/foo') == test_data
+        router.put('images/photo.jpg', test_data)
+        assert router.get('images/photo.jpg') == test_data
 
-    def test_exists(self, test_data):
-        store_a = DictStore()
-        router = RoutingStore([('a/', store_a)])
+    def test_first_regex_wins(self, test_data):
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('first/')),
+            (r'^images/special', PrefixKeyTransformer('second/')),
+        ])
 
-        assert not router.exists('a/missing')
-        assert not router.exists('unrouted')
-        router.put('a/foo', test_data)
-        assert router.exists('a/foo')
+        router.put('images/special.jpg', test_data)
+        assert store.exists('first/images/special.jpg')
+        assert not store.exists('second/images/special.jpg')
+
+    def test_no_match_raises(self, test_data):
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        with pytest.raises(KeyError):
+            router.get('videos/clip.mp4')
+        with pytest.raises(KeyError):
+            router.put('videos/clip.mp4', test_data)
+
+    def test_exists_no_match_returns_false(self):
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        assert not router.exists('videos/clip.mp4')
 
     def test_delete(self, test_data):
-        store_a = DictStore()
-        router = RoutingStore([('a/', store_a)])
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        router.put('images/photo.jpg', test_data)
+        router.delete('images/photo.jpg')
+        assert not router.exists('images/photo.jpg')
 
-        router.put('a/foo', test_data)
-        router.delete('a/foo')
-        assert not router.exists('a/foo')
+    def test_keys_raises(self, test_data):
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'^images/', PrefixKeyTransformer('img/')),
+        ])
+        with pytest.raises(NotImplementedError):
+            list(router.keys())
 
-    def test_keys(self, test_data):
-        store_a = DictStore()
-        store_b = DictStore()
-        router = RoutingStore([('a/', store_a), ('b/', store_b)])
+    def test_regex_pattern_matching(self, test_data):
+        """Test that full regex features work, not just prefix matching."""
+        store = DictStore()
+        router = RegexRoutingStore(store, [
+            (r'\.jpg$', PrefixKeyTransformer('jpeg/')),
+            (r'\.png$', PrefixKeyTransformer('png/')),
+        ])
+        router.put('photo.jpg', test_data)
+        router.put('icon.png', test_data)
 
-        router.put('a/foo', test_data)
-        router.put('b/bar', test_data)
-
-        assert set(router.keys()) == {'a/foo', 'b/bar'}
-
-    def test_first_prefix_wins(self, test_data):
-        store_a = DictStore()
-        store_b = DictStore()
-        # both prefixes match 'a/foo', first should win
-        router = RoutingStore([('a/', store_a), ('a/foo', store_b)])
-
-        router.put('a/foo', test_data)
-        assert store_a.exists('a/foo')
-        assert not store_b.exists('a/foo')
-
-    def test_no_matching_prefix_raises(self, test_data):
-        router = RoutingStore([('a/', DictStore())])
-        with pytest.raises(KeyError):
-            router.get('b/foo')
-        with pytest.raises(KeyError):
-            router.put('b/foo', test_data)
-
-    def test_strip_prefix(self, test_data):
-        child = DictStore()
-        router = RoutingStore([('a/', child, True)])
-
-        router.put('a/foo', test_data)
-        assert child.exists('foo')          # prefix stripped when stored
-        assert not child.exists('a/foo')
-        assert router.get('a/foo') == test_data
-        assert router.exists('a/foo')
-        assert not router.exists('foo')     # unrouted key returns False
-
-        router.delete('a/foo')
-        assert not child.exists('foo')
-
-    def test_strip_prefix_keys(self, test_data):
-        child = DictStore()
-        router = RoutingStore([('a/', child, True)])
-
-        router.put('a/foo', test_data)
-        router.put('a/bar', test_data)
-        assert set(router.keys()) == {'a/foo', 'a/bar'}
-
-    def test_strip_prefix_mixed_routes(self, test_data):
-        child_strip = DictStore()
-        child_keep = DictStore()
-        router = RoutingStore([('a/', child_strip, True), ('b/', child_keep)])
-
-        router.put('a/foo', test_data)
-        router.put('b/bar', test_data)
-
-        assert child_strip.exists('foo')
-        assert child_keep.exists('b/bar')
-        assert set(router.keys()) == {'a/foo', 'b/bar'}
+        assert store.exists('jpeg/photo.jpg')
+        assert store.exists('png/icon.png')
+        assert router.get('photo.jpg') == test_data
+        assert router.get('icon.png') == test_data
 
 
 def test_copy_store(store, test_data):
